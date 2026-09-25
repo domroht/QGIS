@@ -15,7 +15,7 @@ AAR = DATA_DIR / "ddm_study_area_aar.tif"
 # output paths
 OUTPUT_DIR = PROJECT_DIR / "output"
 
-def check_required_files(paths):
+def check_required_files(paths: dict[str, Path]):
     
     missing = [
         path
@@ -25,8 +25,13 @@ def check_required_files(paths):
 
     return missing
 
-def validate_inputs(rasters):
-    missing_files = check_required_files(rasters)
+def validate_inputs(paths: dict[str, Path]):
+    
+    if not paths:
+        print("ERROR: No input rasters specified.")
+        raise SystemExit(1)
+
+    missing_files = check_required_files(paths)
 
     if missing_files:
         print("ERROR: Missing input files:")
@@ -55,12 +60,40 @@ def inspect_raster(path: Path):
             "mean": float(data.mean()) if valid_pixels else None,
         }
 
+def check_grid_consistency(paths: dict[str, Path]):
+    """Check that rasters use the same spatial grid."""
+
+    with rasterio.open(paths["dybde"]) as depth:
+        reference = {
+            "shape": depth.shape,
+            "crs": depth.crs,
+            "transform": depth.transform,
+            "resolution": depth.res,
+        }
+
+    results = []
+
+    for name, path in paths.items():
+
+        with rasterio.open(path) as src:
+
+            checks = {
+                "shape": src.shape == reference["shape"],
+                "crs": src.crs == reference["crs"],
+                "transform": src.transform == reference["transform"],
+                "resolution": src.res == reference["resolution"],
+            }
+
+            results.append((name, checks))
+
+    return results
+
 
 def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    rasters = {
+    rasters: dict[str, Path] = {
         "dybde": DYBDE,
         "kilde": KILDE,
         "aar": AAR,
