@@ -61,7 +61,6 @@ def inspect_raster(path: Path):
         }
 
 def check_grid_consistency(paths: dict[str, Path]):
-    """Check that rasters use the same spatial grid."""
 
     with rasterio.open(paths["dybde"]) as depth:
         reference = {
@@ -88,6 +87,58 @@ def check_grid_consistency(paths: dict[str, Path]):
 
     return results
 
+def check_kilde_values(path: Path):
+
+    # ddm data kilder er nummeret mellem 1-8
+    valid_kilde_codes = np.arange(1, 9)
+
+    with rasterio.open(path) as kilde_raster:
+        source = kilde_raster.read(1, masked=True)
+
+    valid_values = np.unique(source.compressed())
+
+    # Find de valide værdier i kilde_raster og lav en liste med alle der ikke er en del a de valide kilde koder
+    invalid_values = valid_values[
+        ~np.isin(valid_values, valid_kilde_codes)
+    ]
+
+    passed = len(invalid_values) == 0
+
+    return {
+        "passed": passed,
+        "valid_values": valid_values.astype(int).tolist(),
+        "invalid_values": invalid_values.astype(int).tolist(),
+    }
+
+
+def check_dybde_values(path: Path):
+
+    with rasterio.open(path) as src:
+        depth = src.read(1, masked=True)
+
+    values = depth.compressed()
+
+    negative_pixels = int(
+        np.sum(values < 0)
+    )
+
+    nonfinite_pixels = int(
+        np.sum(~np.isfinite(values))
+    )
+
+    passed = (
+        len(values) > 0
+        and negative_pixels == 0
+        and nonfinite_pixels == 0
+    )
+
+    return {
+        "passed": passed,
+        "valid_pixels": len(values),
+        "negative_pixels": negative_pixels,
+        "nonfinite_pixels": nonfinite_pixels,
+    }
+
 
 def main():
 
@@ -100,6 +151,9 @@ def main():
     }
 
     validate_inputs(rasters)
+
+    kilde_check = check_kilde_values(rasters["kilde"])
+    dybde_check = check_dybde_values(rasters["dybde"])
 
     print("Ran script data_qa.py")
 
