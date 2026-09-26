@@ -15,7 +15,8 @@ AAR = DATA_DIR / "ddm_study_area_aar.tif"
 # output paths
 OUTPUT_DIR = PROJECT_DIR / "output"
 
-LOCAL_RANGE = OUTPUT_DIR / "dybde_local_range_3x3.tif"
+DYBDE_LOCAL_RANGE = OUTPUT_DIR / "dybde_local_range_3x3.tif"
+PL_VARIATION_MASK_FLAGS = OUTPUT_DIR / "pl_variation_mask_flags.tif"
 
 def check_required_files(paths: dict[str, Path]):
     
@@ -406,6 +407,7 @@ def analyze_pl_variation_mask(
         "variation_mask_pixels": int(
             variation_mask.sum()
         ),
+        "variation_mask": variation_mask,
         "depth": {
             "valid_pixels": len(dybde_values),
             "mean": float(dybde_values.mean()),
@@ -418,6 +420,42 @@ def analyze_pl_variation_mask(
         "kilde_aar": kilde_x_aar,
     }
 
+def create_pl_variation_mask_flags(
+    dybde_path: Path,
+    variation_mask: Path,
+    output_path: Path,
+):
+    with rasterio.open(depth_path) as dybde_raster:
+        dybde = dybde_raster.read(1, masked=True)
+        profile = dybde_raster.profile.copy()
+
+    # omdan til binær om der er mask eller ej
+    flags = np.where(
+        variation_mask,
+        1,
+        0,
+    ).astype(np.uint8)
+
+    flags[dybde.mask] = 255
+
+    profile.update(
+        dtype="uint8",
+        nodata=255,
+        count=1,
+        compress="deflate",
+    )
+
+    with rasterio.open(
+        output_path,
+        "w",
+        **profile,
+    ) as dst:
+        dst.write(flags, 1)
+
+    return {
+        "flagged_pixels": int(np.sum(flags == 1)),
+        "output": output_path,
+    }
 
 
 def main():
@@ -437,11 +475,11 @@ def main():
 
     calculate_local_range(
         DYBDE,
-        LOCAL_RANGE,
+        DYBDE_LOCAL_RANGE,
     )
 
     range_stats = analyze_local_range(
-        LOCAL_RANGE
+        DYBDE_LOCAL_RANGE
     )
 
     print(range_stats)
