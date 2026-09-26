@@ -288,7 +288,84 @@ def get_pl_variation_mask(path: Path, percentile_limit: int):
         & (local_range.data >= threshold)
     )
 
-    return variation_mask
+    return threshold, variation_mask
+
+
+def analyze_pl_variation_mask(
+    dybde_path: Path,
+    kilde_path: Path,
+    aar_path: Path,
+    range_path: Path,
+    percentile_limit: int,
+):
+    """
+    Funktion der skal finde sammenhæg med lokal variation af dybdeværdier over en betstemt percentil grænse 
+        - Kigger på hvilken dybde de har, deres data kilde og oprindelses år
+    """
+
+    threshold, variation_mask = (
+        get_pl_variation_mask_mask(range_path, percentile_limit)
+    )
+
+    with rasterio.open(dybde_path) as dybde_raster:
+        dybde = dybde_raster.read(1, masked=True)
+
+    with rasterio.open(kilde_path) as kilde_rasterc:
+        kilde = kilde_rasterc.read(1, masked=True)
+
+    with rasterio.open(aar_path) as aar_raster:
+        aar = aar_raster.read(1, masked=True)
+
+    dybde_values = dybde[variation_mask].compressed()
+    kilde_values = kilde[variation_mask].compressed()
+    aar_values = aar[variation_mask].compressed()
+
+    kilde_counts = {}
+    aar_counts = {}
+
+    if len(kilde_values) > 0:
+        # finder hvilke kilder de har (1-8) og hvor mange gange de er der (retuner 2 arrays)
+        unique, counts = np.unique(
+            kilde_values,
+            return_counts=True,
+        )
+        # omdan de 2 arrays til et dict
+        kilde_counts = {
+            int(value): int(count)
+            for value, count
+            in zip(unique, counts)
+        }
+
+    if len(aar_values) > 0:
+
+        unique, counts = np.unique(
+            aar_values,
+            return_counts=True,
+        )
+
+        aar_counts = {
+            int(value): int(count)
+            for value, count
+            in zip(unique, counts)
+        }
+
+    return {
+        "pl_threshold": float(threshold),
+        "variation_mask_pixels": int(
+            variation_mask.sum()
+        ),
+        "depth": {
+            "valid_pixels": len(depth_values),
+            "mean": float(depth_values.mean()),
+            "median": float(np.median(depth_values)),
+            "min": float(depth_values.min()),
+            "max": float(depth_values.max()),
+        },
+        "source_counts": source_counts,
+        "year_counts": year_counts,
+    }
+
+
 
 def main():
 
