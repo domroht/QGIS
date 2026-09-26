@@ -15,7 +15,7 @@ AAR = DATA_DIR / "ddm_study_area_aar.tif"
 # output paths
 OUTPUT_DIR = PROJECT_DIR / "output"
 
-LOCAL_RANGE = OUTPUT_DIR / "depth_local_range_3x3.tif"
+LOCAL_RANGE = OUTPUT_DIR / "dybde_local_range_3x3.tif"
 
 def check_required_files(paths: dict[str, Path]):
     
@@ -64,12 +64,12 @@ def inspect_raster(path: Path):
 
 def check_grid_consistency(paths: dict[str, Path]):
 
-    with rasterio.open(paths["dybde"]) as depth:
+    with rasterio.open(paths["dybde"]) as dybde_raster:
         reference = {
-            "shape": depth.shape,
-            "crs": depth.crs,
-            "transform": depth.transform,
-            "resolution": depth.res,
+            "shape": dybde_raster.shape,
+            "crs": dybde_raster.crs,
+            "transform": dybde_raster.transform,
+            "resolution": dybde_raster.res,
         }
 
     results = []
@@ -95,9 +95,9 @@ def check_kilde_values(path: Path):
     valid_kilde_codes = np.arange(1, 9)
 
     with rasterio.open(path) as kilde_raster:
-        source = kilde_raster.read(1, masked=True)
+        kilde = kilde_raster.read(1, masked=True)
 
-    valid_values = np.unique(source.compressed())
+    valid_values = np.unique(kilde.compressed())
 
     # Find de valide værdier i kilde_raster og lav en liste med alle der ikke er en del a de valide kilde koder
     invalid_values = valid_values[
@@ -115,10 +115,10 @@ def check_kilde_values(path: Path):
 
 def check_dybde_values(path: Path):
 
-    with rasterio.open(path) as raster:
-        depth = raster.read(1, masked=True)
+    with rasterio.open(path) as dybde_raster:
+        dybde = dybde_raster.read(1, masked=True)
 
-    values = depth.compressed()
+    values = dybde.compressed()
 
     negative_pixels = int(
         np.sum(values < 0)
@@ -301,10 +301,11 @@ def analyze_pl_variation_mask(
     """
     Funktion der skal finde sammenhæg med lokal variation af dybdeværdier over en betstemt percentil grænse 
         - Kigger på hvilken dybde de har, deres data kilde og oprindelses år
+        - sammenhæng mellem data kilde og oprindelses år
     """
 
     threshold, variation_mask = (
-        get_pl_variation_mask_mask(range_path, percentile_limit)
+        get_pl_variation_mask(range_path, percentile_limit)
     )
 
     with rasterio.open(dybde_path) as dybde_raster:
@@ -323,9 +324,12 @@ def analyze_pl_variation_mask(
     kilde_counts = {}
     aar_counts = {}
 
+    # defineres in case len(kilde_values) <= 0 bruges senere til at finde kilde_x_aar  
+    kilde_unique = []
+
     if len(kilde_values) > 0:
         # finder hvilke kilder de har (1-8) og hvor mange gange de er der (retuner 2 arrays)
-        unique, counts = np.unique(
+        kilde_unique, kilde_count_values = np.unique(
             kilde_values,
             return_counts=True,
         )
@@ -333,12 +337,12 @@ def analyze_pl_variation_mask(
         kilde_counts = {
             int(value): int(count)
             for value, count
-            in zip(unique, counts)
+            in zip(kilde_unique, kilde_count_values)
         }
 
     if len(aar_values) > 0:
 
-        unique, counts = np.unique(
+        aar_unique, aar_count_values = np.unique(
             aar_values,
             return_counts=True,
         )
@@ -346,7 +350,55 @@ def analyze_pl_variation_mask(
         aar_counts = {
             int(value): int(count)
             for value, count
-            in zip(unique, counts)
+            in zip(aar_unique, aar_count_values)
+        }
+
+    kilde_x_aar = {}
+
+    for kilde_code in kilde_unique:
+
+        # Pixels med: høj lokal variation, gyldig kilde og den aktuelle kildekode
+        kilde_mask = (
+            variation_mask
+            & ~kilde.mask
+            & (kilde.data == kilde_code)
+        )
+
+        total = int(kilde_mask.sum())
+
+        code_aar = {}
+
+        if total > 0:
+
+            # Find år for de pixels der har et gyldigt år
+            aar_values_for_kilde = aar.data[
+                kilde_mask
+                & ~aar.mask
+            ]
+
+            if len(aar_values_for_kilde) > 0:
+
+                unique, counts = np.unique(
+                    aar_values_for_kilde,
+                    return_counts=True,
+                )
+
+                code_aar = {
+                    int(value): int(count)
+                    for value, count
+                    in zip(unique, counts)
+                }
+
+        # Hvor mange pixels mangler et gyldigt år?
+        missing_aar = (
+            kilde_mask
+            & aar.mask
+        )
+
+        kilde_x_aar[int(kilde_code)] = {
+            "total": total,
+            "years": code_aar,
+            "missing_year": int(missing_aar.sum()),
         }
 
     return {
@@ -355,14 +407,15 @@ def analyze_pl_variation_mask(
             variation_mask.sum()
         ),
         "depth": {
-            "valid_pixels": len(depth_values),
-            "mean": float(depth_values.mean()),
-            "median": float(np.median(depth_values)),
-            "min": float(depth_values.min()),
-            "max": float(depth_values.max()),
+            "valid_pixels": len(dybde_values),
+            "mean": float(dybde_values.mean()),
+            "median": float(np.median(dybde_values)),
+            "min": float(dybde_values.min()),
+            "max": float(dybde_values.max()),
         },
-        "source_counts": source_counts,
-        "year_counts": year_counts,
+        "source_counts": kilde_counts,
+        "year_counts": aar_counts,
+        "kilde_aar": kilde_x_aar,
     }
 
 
