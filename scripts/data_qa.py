@@ -266,6 +266,29 @@ def analyze_local_range(path: Path):
         "std": float(values.std()),
     }
 
+def get_pl_variation_mask(path: Path, percentile_limit: int):
+
+    with rasterio.open(path) as raster:
+        local_range = raster.read(1, masked=True)
+
+    values = local_range.compressed()
+
+    if len(values) == 0:
+        return None
+
+    # udregner grænsen for den givne percentil (gentagelse fra analyze_local_range())
+    threshold = np.percentile(
+        values,
+        percentile_limit,
+    )
+
+    # for hver pixel kontroller vi den er gyldig og over den percentile grænse
+    variation_mask = (
+        ~local_range.mask
+        & (local_range.data >= threshold)
+    )
+
+    return variation_mask
 
 def main():
 
