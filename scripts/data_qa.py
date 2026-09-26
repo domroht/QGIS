@@ -15,6 +15,8 @@ AAR = DATA_DIR / "ddm_study_area_aar.tif"
 # output paths
 OUTPUT_DIR = PROJECT_DIR / "output"
 
+LOCAL_RANGE = OUTPUT_DIR / "depth_local_range_3x3.tif"
+
 def check_required_files(paths: dict[str, Path]):
     
     missing = [
@@ -234,6 +236,36 @@ def calculate_local_range(input_path: Path, output_path: Path):
 
             dst.write(output, 1)
 
+def analyze_local_range(path: Path):
+
+    with rasterio.open(path) as raster:
+        data = raster.read(1, masked=True)
+
+    # fjern maskerede pixels (returnere i 1D array)
+    values = data.compressed()
+
+    if len(values) == 0:
+        return None
+
+    percentiles = np.percentile(
+        values,
+        [50, 75, 90, 95, 99],
+    )
+
+    # retuner statstik på vores lokal variation raster
+    return {
+        "valid_pixels": len(values),
+        "min": float(values.min()),
+        "max": float(values.max()),
+        "mean": float(values.mean()),
+        "median": float(percentiles[0]),
+        "p75": float(percentiles[1]),
+        "p90": float(percentiles[2]),
+        "p95": float(percentiles[3]),
+        "p99": float(percentiles[4]),
+        "std": float(values.std()),
+    }
+
 
 def main():
 
@@ -249,6 +281,17 @@ def main():
 
     kilde_check = check_kilde_values(rasters["kilde"])
     dybde_check = check_dybde_values(rasters["dybde"])
+
+    calculate_local_range(
+        DYBDE,
+        LOCAL_RANGE,
+    )
+
+    range_stats = analyze_local_range(
+        LOCAL_RANGE
+    )
+
+    print(range_stats)
 
     print("Ran script data_qa.py")
 
