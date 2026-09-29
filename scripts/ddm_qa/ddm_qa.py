@@ -21,9 +21,11 @@ from .local_variation import (
     get_pl_variation_mask,
     analyze_pl_variation_mask,
     create_pl_variation_mask_flags,
+    identify_pl_variation_areas,
+    analyze_pl_variation_areas,
 )
 
-def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path: Path, percentile_limit: int) -> dict:
+def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path: Path, percentile_limit: int, pl_area_connect: int) -> dict:
 
     qa_results = {
         "input_validation": {},
@@ -121,6 +123,24 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path
             threshold,
         )
     )
+
+    labeled_areas, areas = identify_pl_variation_areas(
+        variation_mask,
+        connectivity=pl_area_connect,
+    )
+
+    area_analysis = analyze_pl_variation_areas(
+        rasters["dybde"],
+        rasters["kilde"],
+        rasters["aar"],
+        labeled_areas,
+    )
+
+    qa_results["local_variation"]["areas"] = {
+        "connectivity": pl_area_connect,
+        "count": len(areas),
+        "areas": area_analysis,
+    }
 
     #=====================================#
     #==          DDM QA OUTPUT          ==#

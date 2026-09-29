@@ -1,4 +1,5 @@
 from pathlib import Path
+from scipy.ndimage import generate_binary_structure, label
 
 import numpy as np
 import rasterio
@@ -291,3 +292,160 @@ def create_pl_variation_mask_flags(dybde_path: Path, variation_mask: np.ndarray,
         ),
         "output": output_path,
     }
+
+def identify_pl_variation_areas(variation_mask: np.ndarray, connectivity: int) -> tuple[np.ndarray, dict]:
+
+    if connectivity not in (4, 8):
+        raise ValueError("Connectivity must be either 4 or 8.")
+
+    if connectivity == 4:
+        structure = generate_binary_structure(
+            rank=2,
+            connectivity=1,
+        )
+
+    else:
+        structure = generate_binary_structure(
+            rank=2,
+            connectivity=2,
+        )
+
+    labeled_areas, area_count = label(
+        variation_mask,
+        structure=structure,
+    )
+
+    areas = {}
+
+    for area_id in range(1, area_count + 1):
+
+        pixel_count = int(
+            np.sum(labeled_areas == area_id)
+        )
+
+        areas[area_id] = {
+            "pixels": pixel_count,
+        }
+
+    return labeled_areas, areas
+
+def analyze_pl_variation_areas(dybde_path: Path, kilde_path: Path, aar_path: Path, labeled_areas: np.ndarray) -> dict:
+    """
+    For hvert område beregnes:
+        - antal pixels i området
+        - antal gyldige dybdepixels
+        - antal gyldige kildepixels
+        - antal gyldige årspixels
+        - dybde-statistik
+        - fordeling af datakilder
+        - fordeling af år
+    """
+
+    with rasterio.open(dybde_path) as dybde_raster:
+        dybde = dybde_raster.read(1, masked=True)
+
+    with rasterio.open(kilde_path) as kilde_raster:
+        kilde = kilde_raster.read(1, masked=True)
+
+    with rasterio.open(aar_path) as aar_raster:
+        aar = aar_raster.read(1, masked=True)
+
+    areas = {}
+
+    area_ids = np.unique(labeled_areas)
+
+    for area_id in area_ids:
+
+        if area_id == 0:
+            continue
+
+        area_mask = (
+            labeled_areas == area_id
+        )
+
+        pixel_count = int(
+            area_mask.sum()
+        )
+
+        dybde_values = dybde[
+            area_mask
+        ].compressed()
+
+        kilde_values = kilde[
+            area_mask
+        ].compressed()
+
+        aar_values = aar[
+            area_mask
+        ].compressed()
+
+        area_result = {
+            "pixels": pixel_count,
+
+            "valid_depth_pixels": int(
+                len(dybde_values)
+            ),
+            "valid_depth_percentage": (
+                len(dybde_values) / pixel_count * 100
+                if pixel_count > 0
+                else 0
+            ),
+
+            "valid_source_pixels": int(
+                len(kilde_values)
+            ),
+            "valid_source_percentage": (
+                len(kilde_values) / pixel_count * 100
+                if pixel_count > 0
+                else 0
+            ),
+
+            "valid_year_pixels": int(
+                len(aar_values)
+            ),
+            "valid_year_percentage": (
+                len(aar_values) / pixel_count * 100
+                if pixel_count > 0
+                else 0
+            ),
+        }
+
+        if len(dybde_values) > 0:
+            
+            area_result["depth"] = {
+                "mean": float(dybde_values.mean()),
+                "median": float(np.median(dybde_values)),
+                "min": float(dybde_values.min()),
+                "max": float(dybde_values.max()),
+                "range": float(dybde_values.max() - dybde_values.min()),
+            }
+
+        if len(kilde_values) > 0:
+
+            unique, counts = np.unique(
+                kilde_values,
+                return_counts=True,
+            )
+
+            area_result["source_counts"] = {
+                int(value): int(count)
+                for value, count
+                in zip(unique, counts)
+            }
+
+        if len(aar_values) > 0:
+
+            unique, counts = np.unique(
+                aar_values,
+                return_counts=True,
+            )
+
+            area_result["year_counts"] = {
+                int(value): int(count)
+                for value, count
+                in zip(unique, counts)
+            }
+
+        areas[int(area_id)] = area_result
+
+    return areas

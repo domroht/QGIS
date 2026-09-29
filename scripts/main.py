@@ -31,6 +31,7 @@ def main():
         local_range_path=DYBDE_LOCAL_RANGE,
         high_variation_path=PL_VARIATION_MASK_FLAGS,
         percentile_limit=95,
+        pl_area_connect=8,
     )
 
     with QA_RESULTS_JSON.open("w", encoding="utf-8") as file:
