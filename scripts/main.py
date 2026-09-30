@@ -15,10 +15,21 @@ OUTPUT_DIR = PROJECT_DIR / "output"
 
 DYBDE_LOCAL_RANGE = OUTPUT_DIR / "dybde_local_range_3x3.tif"
 PL_VARIATION_MASK_FLAGS = OUTPUT_DIR / "pl_variation_mask_flags.tif"
+PL_VARIATION_AREAS = OUTPUT_DIR / "pl_variation_areas.tif"
 QA_RESULTS_JSON = OUTPUT_DIR / "qa_results.json"
 
+def ensure_output_directory(path: Path) -> None:
+    path.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
 def main():
+
+    ensure_output_directory(
+        OUTPUT_DIR
+    )
+
 
     rasters = {
         "dybde": DYBDE,
@@ -29,7 +40,8 @@ def main():
     qa_results = ddm_qa(
         rasters=rasters,
         local_range_path=DYBDE_LOCAL_RANGE,
-        high_variation_path=PL_VARIATION_MASK_FLAGS,
+        pl_variation_path=PL_VARIATION_MASK_FLAGS,
+        pl_variation_areas_path=PL_VARIATION_AREAS,
         percentile_limit=95,
         pl_area_connect=8,
     )

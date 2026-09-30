@@ -449,3 +449,39 @@ def analyze_pl_variation_areas(dybde_path: Path, kilde_path: Path, aar_path: Pat
         areas[int(area_id)] = area_result
 
     return areas
+
+def create_pl_variation_areas_raster(dybde_path: Path, labeled_areas: np.ndarray,output_path: Path) -> dict:
+
+    with rasterio.open(dybde_path) as dybde_raster:
+        dybde = dybde_raster.read(1, masked=True)
+        profile = dybde_raster.profile.copy()
+
+    area_raster = np.where(
+        labeled_areas > 0,
+        labeled_areas,
+        0,
+    ).astype(np.uint16)
+
+    area_raster[dybde.mask] = 255
+
+    profile.update(
+        dtype="uint16",
+        nodata=255,
+        count=1,
+        compress="deflate",
+    )
+
+    with rasterio.open(
+        output_path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(area_raster, 1)
+
+    return {
+        "area_count": int(
+            np.max(labeled_areas)
+        ),
+        "output": output_path,
+    }

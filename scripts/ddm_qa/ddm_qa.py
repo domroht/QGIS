@@ -14,6 +14,7 @@ from .input_inspection import (
     get_value_percentages,
     get_value_pair_distribution,
     get_raster_statistics,
+    get_raster_metadata_collection,
 )
 
 from .local_variation import (
@@ -23,14 +24,21 @@ from .local_variation import (
     create_pl_variation_mask_flags,
     identify_pl_variation_areas,
     analyze_pl_variation_areas,
+    create_pl_variation_areas_raster,    
 )
 
-def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path: Path, percentile_limit: int, pl_area_connect: int) -> dict:
+from .qa_observations import (
+    evaluate_all_observations,
+)
+
+def ddm_qa(rasters: dict[str, Path], local_range_path: Path, pl_variation_path: Path, pl_variation_areas_path: Path, percentile_limit: int, pl_area_connect: int) -> dict:
 
     qa_results = {
         "input_validation": {},
         "input_inspection": {},
+        "metadata": {},
         "local_variation": {},
+        "observations": [],
         "outputs": {},
     }
 
@@ -97,6 +105,12 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path
     )
 
     #=====================================#
+    #==       METADATA INSPECTION       ==#
+    #=====================================#
+
+    qa_results["metadata"] = get_raster_metadata_collection(rasters)
+
+    #=====================================#
     #==         LOCAL VARIATION         ==#
     #=====================================#
 
@@ -136,6 +150,14 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path
         labeled_areas,
     )
 
+    pl_variation_areas_result = (
+        create_pl_variation_areas_raster(
+            rasters["dybde"],
+            labeled_areas,
+            pl_variation_areas_path,
+        )
+    )
+
     qa_results["local_variation"]["areas"] = {
         "connectivity": pl_area_connect,
         "count": len(areas),
@@ -143,7 +165,7 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path
     }
 
     #=====================================#
-    #==          DDM QA OUTPUT          ==#
+    #==            QA OUTPUT            ==#
     #=====================================#
 
     qa_results["outputs"]["local_range"] = {
@@ -153,9 +175,25 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, high_variation_path
     flags_result = create_pl_variation_mask_flags(
         rasters["dybde"],
         variation_mask,
-        high_variation_path,
+        pl_variation_path,
     )
 
-    qa_results["outputs"]["high_variation"] = flags_result
+    qa_results["outputs"]["pl_variation"] = flags_result
+
+    qa_results["outputs"]["pl_variation_areas"] = (
+        pl_variation_areas_result
+    )
+
+    #=====================================#
+    #==         QA OBSERVATIONS         ==#
+    #=====================================#
+
+    qa_results["observations"] = evaluate_all_observations(
+        input_validation=qa_results["input_validation"],
+        input_inspection=qa_results["input_inspection"],
+        metadata=qa_results["metadata"],
+        local_variation=qa_results["local_variation"],
+    )
+
 
     return qa_results

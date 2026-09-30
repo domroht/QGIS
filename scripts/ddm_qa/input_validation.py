@@ -161,6 +161,7 @@ def validate_aar_values(path: Path) -> dict:
         ~np.isfinite(values)
         | (values != values.astype(int))
         | (values <= 0)
+        | (values <= 2024)
     )
 
     invalid_pixels = int(

@@ -144,4 +144,43 @@ def get_value_pair_distribution(first_path: Path, second_path: Path) -> dict:
 
     return result
 
+def get_raster_metadata(path: Path) -> dict:
 
+    with rasterio.open(path) as raster:
+        default_tags = raster.tags()
+        namespaces = raster.tag_namespaces()
+
+        namespace_tags = {}
+
+        for namespace in namespaces:
+            namespace_tags[namespace] = raster.tags(ns=namespace)
+
+        band_descriptions = list(raster.descriptions)
+        band_units = list(raster.units)
+        band_scales = list(raster.scales)
+        band_offsets = list(raster.offsets)
+
+        return {
+            "file": path.name,
+            "driver": raster.driver,
+            "count": raster.count,
+            "dtype": raster.dtypes[0],
+            "crs": str(raster.crs) if raster.crs else None,
+            "nodata": raster.nodata,
+            "descriptions": band_descriptions,
+            "units": band_units,
+            "scales": band_scales,
+            "offsets": band_offsets,
+            "tags": default_tags,
+            "tag_namespaces": namespaces,
+            "namespace_tags": namespace_tags,
+        }
+
+def get_raster_metadata_collection(paths: dict[str, Path]) -> dict:
+
+    metadata = {}
+
+    for name, path in paths.items():
+        metadata[name] = get_raster_metadata(path)
+
+    return metadata
