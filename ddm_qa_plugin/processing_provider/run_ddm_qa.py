@@ -24,6 +24,7 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
     PL_VARIATION = "PL_VARIATION"
     PL_VARIATION_AREAS = "PL_VARIATION_AREAS"
     QA_RESULTS = "QA_RESULTS"
+    REPORT_HTML = "REPORT_HTML"
 
     def name(self):
         return "run_qa"
@@ -128,6 +129,14 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+        self.addParameter(
+            QgsProcessingParameterFileDestination(
+                self.REPORT_HTML,
+                "QA report HTML",
+                fileFilter="HTML files (*.html *.htm)",
+            )
+        )
+
     # Bliver kaldt når man trykker på run i QGIS
     def processAlgorithm(self, parameters, context, feedback):
 
@@ -216,6 +225,8 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
 
         result_json = Path(self.parameterAsFileOutput(parameters, self.QA_RESULTS, context))
 
+        report_path = self.parameterAsFileOutput(parameters, self.REPORT_HTML, context)
+
         feedback.pushInfo(f"Local range output: {local_range}")
 
         feedback.pushInfo(f"PL variation output: {pl_variation}")
@@ -223,6 +234,8 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(f"PL variation areas output: {pl_variation_areas}")
 
         feedback.pushInfo(f"QA results output: {result_json}")
+
+        feedback.pushInfo(f"QA report output: {report_path}")
 
         # fjern python_executable og qa_script og erstat med str(qa_executable),
         command = [
@@ -246,6 +259,8 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             str(connectivity),
             "--result-json",
             str(result_json),
+            "--report-html",
+            str(report_path),
         ]
 
         feedback.pushInfo("Starting DDM QA engine...")
@@ -299,4 +314,5 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             self.PL_VARIATION: str(pl_variation),
             self.PL_VARIATION_AREAS: str(pl_variation_areas),
             self.QA_RESULTS: str(result_json),
+            self.REPORT_HTML: str(report_path),
         }

@@ -71,12 +71,15 @@ def test_ddm_qa_runs_successfully(tmp_path):
     local_range_path = tmp_path / "local_range.tif"
     pl_variation_path = tmp_path / "pl_variation.tif"
     pl_variation_areas_path = tmp_path / "pl_variation_areas.tif"
+    report_path = tmp_path / "qa_report.html"
 
     result = ddm_qa(
         rasters=rasters,
         local_range_path=local_range_path,
         pl_variation_path=pl_variation_path,
         pl_variation_areas_path=pl_variation_areas_path,
+        report_path=report_path,
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -98,6 +101,8 @@ def test_ddm_qa_validation_passes(tmp_path):
         local_range_path=tmp_path / "local_range.tif",
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -120,6 +125,8 @@ def test_ddm_qa_creates_local_range_output(tmp_path):
         local_range_path=local_range_path,
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -139,6 +146,8 @@ def test_ddm_qa_creates_variation_outputs(tmp_path):
         local_range_path=local_range_path,
         pl_variation_path=pl_variation_path,
         pl_variation_areas_path=pl_variation_areas_path,
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -149,6 +158,27 @@ def test_ddm_qa_creates_variation_outputs(tmp_path):
     assert "pl_variation" in result["outputs"]
     assert "pl_variation_areas" in result["outputs"]
 
+def test_ddm_qa_creates_report(tmp_path):
+    rasters = create_valid_dataset(tmp_path)
+
+    report_path = tmp_path / "qa_report.html"
+    report_figure_dir = tmp_path / "report_figures"
+
+    result = ddm_qa(
+        rasters=rasters,
+        local_range_path=tmp_path / "local_range.tif",
+        pl_variation_path=tmp_path / "pl_variation.tif",
+        pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=report_path,
+        report_figure_dir=report_figure_dir,
+        percentile_limit=95,
+        pl_area_connect=8,
+    )
+
+    assert report_path.is_file()
+    assert result["outputs"]["report"]["path"] == report_path
+    assert report_figure_dir.is_dir()
+
 def test_ddm_qa_local_variation_contains_analysis(tmp_path):
     rasters = create_valid_dataset(tmp_path)
 
@@ -157,6 +187,8 @@ def test_ddm_qa_local_variation_contains_analysis(tmp_path):
         local_range_path=tmp_path / "local_range.tif",
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -178,6 +210,8 @@ def test_ddm_qa_creates_observations(tmp_path):
         local_range_path=tmp_path / "local_range.tif",
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -207,6 +241,8 @@ def test_ddm_qa_stops_when_input_file_is_missing(tmp_path):
         local_range_path=tmp_path / "local_range.tif",
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -234,6 +270,8 @@ def test_ddm_qa_stops_when_grid_is_inconsistent(tmp_path):
         local_range_path=tmp_path / "local_range.tif",
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=95,
         pl_area_connect=8,
     )
@@ -254,6 +292,8 @@ def test_ddm_qa_uses_requested_percentile_and_connectivity(tmp_path):
         local_range_path=tmp_path / "local_range.tif",
         pl_variation_path=tmp_path / "pl_variation.tif",
         pl_variation_areas_path=tmp_path / "pl_variation_areas.tif",
+        report_path=tmp_path / "qa_report.html",
+        report_figure_dir=tmp_path / "report_figures",
         percentile_limit=90,
         pl_area_connect=4,
     )

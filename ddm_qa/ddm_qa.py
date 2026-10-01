@@ -27,12 +27,19 @@ from .local_variation import (
     create_pl_variation_areas_raster,    
 )
 
-from .qa_observations import (
-    evaluate_all_observations,
-)
+from .qa_observations import evaluate_all_observations
+from .qa_report import generate_report
 
-def ddm_qa(rasters: dict[str, Path], local_range_path: Path, pl_variation_path: Path, pl_variation_areas_path: Path, percentile_limit: int, pl_area_connect: int) -> dict:
-
+def ddm_qa(
+    rasters: dict[str, Path],
+    local_range_path: Path,
+    pl_variation_path: Path,
+    pl_variation_areas_path: Path,
+    report_path: Path,
+    report_figure_dir: Path,
+    percentile_limit: int,
+    pl_area_connect: int,
+) -> dict:
     qa_results = {
         "input_validation": {},
         "input_inspection": {},
@@ -210,5 +217,20 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, pl_variation_path: 
         local_variation=qa_results["local_variation"],
     )
 
+    #=====================================#
+    #==            QA REPORT            ==#
+    #=====================================#
+
+    report_result = generate_report(
+        results=qa_results,
+        report_path=report_path,
+        figure_dir=report_figure_dir,
+        local_range_path=local_range_path,
+        pl_variation_areas_path=pl_variation_areas_path,
+    )
+
+    qa_results["outputs"]["report"] = {
+        "path": report_result["report"],
+    }
 
     return qa_results

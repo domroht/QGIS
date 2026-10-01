@@ -4,6 +4,6 @@
 __pycache__/
 
 data/
-output/*
+output/
 *.qgz
 *pytest_cache

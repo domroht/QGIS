@@ -64,7 +64,23 @@ def main():
         type=Path,
     )
 
+    parser.add_argument(
+        "--report-html",
+        required=True,
+        type=Path,
+    )
+
     args = parser.parse_args()
+
+    args.result_json.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    args.report_html.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     print("Starting DDM QA...")
     print(f"Dybde: {args.dybde}")
@@ -82,6 +98,8 @@ def main():
         local_range_path=args.local_range,
         pl_variation_path=args.pl_variation,
         pl_variation_areas_path=args.pl_variation_areas,
+        report_path=args.report_html,
+        report_figure_dir=args.report_html.parent / "report_figures",
         percentile_limit=args.percentile_limit,
         pl_area_connect=args.pl_area_connect,
     )
@@ -99,7 +117,6 @@ def main():
         )
 
     print("DDM QA completed.")
-    print(f"Result: {args.result_json}")
 
 
 if __name__ == "__main__":
