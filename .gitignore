@@ -2,3 +2,8 @@
 *.tiff
 .venv/
 __pycache__/
+
+data/
+output/*
+*.qgz
+*pytest_cache

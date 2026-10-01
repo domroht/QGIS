@@ -2,3 +2,4 @@ numpy
 rasterio
 scipy
 pytest
+matplotlib

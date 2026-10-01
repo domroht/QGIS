@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ddm_qa import ddm_qa
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
+PROJECT_DIR = Path(__file__).resolve().parent
 
 DATA_DIR = PROJECT_DIR / "data"
 
