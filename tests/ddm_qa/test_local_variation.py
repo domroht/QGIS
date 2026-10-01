@@ -4,10 +4,13 @@ import rasterio
 from affine import Affine
 
 from ddm_qa.local_variation import (
+    calculate_local_range,
+    get_pl_variation_mask,
     identify_pl_variation_areas,
     analyze_pl_variation_areas,
+    create_pl_variation_mask_flags,
+    create_pl_variation_areas_raster,
 )
-
 
 def test_connectivity_4():
 
@@ -30,7 +33,6 @@ def test_connectivity_4():
     assert areas[3]["pixels"] == 1
     assert areas[4]["pixels"] == 1
 
-
 def test_connectivity_8():
 
     test_mask = np.array([
@@ -50,7 +52,6 @@ def test_connectivity_8():
     assert areas[1]["pixels"] == 2
     assert areas[2]["pixels"] == 2
 
-
 def test_invalid_connectivity():
 
     test_mask = np.array([
@@ -66,6 +67,360 @@ def test_invalid_connectivity():
             connectivity=6,
         )
 
+def test_get_pl_variation_mask_returns_none_for_nodata(tmp_path):
+
+    path = tmp_path / "local_range.tif"
+
+    data = np.full(
+        (3, 3),
+        -9999,
+        dtype=np.float32,
+    )
+
+    profile = {
+        "driver": "GTiff",
+        "height": 3,
+        "width": 3,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    result = get_pl_variation_mask(
+        path,
+        percentile_limit=95,
+    )
+
+    assert result is None
+
+def test_get_pl_variation_mask(tmp_path):
+
+    path = tmp_path / "local_range.tif"
+
+    data = np.array([
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9],
+    ], dtype=np.float32)
+
+    profile = {
+        "driver": "GTiff",
+        "height": 3,
+        "width": 3,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    threshold, variation_mask = get_pl_variation_mask(
+        path,
+        percentile_limit=50,
+    )
+
+    assert threshold == 5
+
+    assert variation_mask.tolist() == [
+        [False, False, False],
+        [False, True, True],
+        [True, True, True],
+    ]
+
+def test_get_pl_variation_mask_respects_nodata(tmp_path):
+
+    path = tmp_path / "local_range.tif"
+
+    data = np.array([
+        [1, 2, -9999],
+        [4, 5, 6],
+        [7, 8, 9],
+    ], dtype=np.float32)
+
+    profile = {
+        "driver": "GTiff",
+        "height": 3,
+        "width": 3,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    threshold, variation_mask = get_pl_variation_mask(
+        path,
+        percentile_limit=50,
+    )
+
+    assert threshold == 5.5
+
+    assert not variation_mask[0, 2]
+    assert not variation_mask[1, 1]
+    assert variation_mask[2, 2]
+
+def test_calculate_local_range(tmp_path):
+
+    input_path = tmp_path / "dybde.tif"
+    output_path = tmp_path / "local_range.tif"
+
+    data = np.array([
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9],
+    ], dtype=np.float32)
+
+    profile = {
+        "driver": "GTiff",
+        "height": 3,
+        "width": 3,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        input_path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    calculate_local_range(
+        input_path,
+        output_path,
+    )
+
+    with rasterio.open(output_path) as raster:
+
+        result = raster.read(1, masked=True)
+
+    assert result.shape == (3, 3)
+
+    assert result[1, 1] == 8
+
+    assert result[0, 0] == 4
+
+def test_calculate_local_range_preserves_nodata(tmp_path):
+
+    input_path = tmp_path / "dybde.tif"
+    output_path = tmp_path / "local_range.tif"
+
+    data = np.array([
+        [1, 2, 3],
+        [4, -9999, 6],
+        [7, 8, 9],
+    ], dtype=np.float32)
+
+    profile = {
+        "driver": "GTiff",
+        "height": 3,
+        "width": 3,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        input_path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    calculate_local_range(
+        input_path,
+        output_path,
+    )
+
+    with rasterio.open(output_path) as raster:
+
+        result = raster.read(1, masked=True)
+
+    assert result.mask[1, 1]
+
+def test_create_pl_variation_mask_flags(tmp_path):
+
+    dybde_path = tmp_path / "dybde.tif"
+    output_path = tmp_path / "flags.tif"
+
+    data = np.array([
+        [1, 2],
+        [3, -9999],
+    ], dtype=np.float32)
+
+    variation_mask = np.array([
+        [True, False],
+        [False, True],
+    ], dtype=bool)
+
+    profile = {
+        "driver": "GTiff",
+        "height": 2,
+        "width": 2,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        dybde_path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    result = create_pl_variation_mask_flags(
+        dybde_path,
+        variation_mask,
+        output_path,
+    )
+
+    with rasterio.open(output_path) as raster:
+
+        output = raster.read(1)
+
+    assert output.tolist() == [
+        [1, 0],
+        [0, 255],
+    ]
+
+    assert result["flagged_pixels"] == 1
+
+def test_create_pl_variation_areas_raster(tmp_path):
+
+    dybde_path = tmp_path / "dybde.tif"
+    output_path = tmp_path / "areas.tif"
+
+    data = np.array([
+        [1, 2],
+        [3, -9999],
+    ], dtype=np.float32)
+
+    labeled_areas = np.array([
+        [1, 2],
+        [3, 0],
+    ])
+
+    profile = {
+        "driver": "GTiff",
+        "height": 2,
+        "width": 2,
+        "count": 1,
+        "dtype": "float32",
+        "crs": "EPSG:4326",
+        "transform": Affine(
+            1,
+            0,
+            0,
+            0,
+            -1,
+            3,
+        ),
+        "nodata": -9999,
+    }
+
+    with rasterio.open(
+        dybde_path,
+        "w",
+        **profile,
+    ) as dst:
+
+        dst.write(data, 1)
+
+    result = create_pl_variation_areas_raster(
+        dybde_path,
+        labeled_areas,
+        output_path,
+    )
+
+    with rasterio.open(output_path) as raster:
+
+        output = raster.read(1)
+
+    assert output.tolist() == [
+        [1, 2],
+        [3, 65535],
+    ]
+
+    assert result["area_count"] == 3
 
 def test_analyze_high_variation_areas(tmp_path):
 

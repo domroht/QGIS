@@ -123,46 +123,59 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, pl_variation_path: 
         get_raster_statistics(local_range_path)
     )
 
-    threshold, variation_mask = get_pl_variation_mask(
+    variation_result = get_pl_variation_mask(
         local_range_path,
         percentile_limit,
     )
 
-    qa_results["local_variation"]["analysis"] = (
-        analyze_pl_variation_mask(
+    if variation_result is None:
+
+        qa_results["local_variation"]["status"] = "NO_VALID_DATA"
+        qa_results["local_variation"]["message"] = (
+            "No valid local variation values were available."
+        )
+
+    else:
+
+        threshold, variation_mask = variation_result
+
+        qa_results["local_variation"]["percentile"] = percentile_limit
+
+        qa_results["local_variation"]["analysis"] = (
+            analyze_pl_variation_mask(
+                rasters["dybde"],
+                rasters["kilde"],
+                rasters["aar"],
+                variation_mask,
+                threshold,
+            )
+        )
+
+        labeled_areas, areas = identify_pl_variation_areas(
+            variation_mask,
+            connectivity=pl_area_connect,
+        )
+
+        area_analysis = analyze_pl_variation_areas(
             rasters["dybde"],
             rasters["kilde"],
             rasters["aar"],
-            variation_mask,
-            threshold,
-        )
-    )
-
-    labeled_areas, areas = identify_pl_variation_areas(
-        variation_mask,
-        connectivity=pl_area_connect,
-    )
-
-    area_analysis = analyze_pl_variation_areas(
-        rasters["dybde"],
-        rasters["kilde"],
-        rasters["aar"],
-        labeled_areas,
-    )
-
-    pl_variation_areas_result = (
-        create_pl_variation_areas_raster(
-            rasters["dybde"],
             labeled_areas,
-            pl_variation_areas_path,
         )
-    )
 
-    qa_results["local_variation"]["areas"] = {
-        "connectivity": pl_area_connect,
-        "count": len(areas),
-        "areas": area_analysis,
-    }
+        pl_variation_areas_result = (
+            create_pl_variation_areas_raster(
+                rasters["dybde"],
+                labeled_areas,
+                pl_variation_areas_path,
+            )
+        )
+
+        qa_results["local_variation"]["areas"] = {
+            "connectivity": pl_area_connect,
+            "count": len(areas),
+            "areas": area_analysis,
+        }
 
     #=====================================#
     #==            QA OUTPUT            ==#
@@ -172,17 +185,19 @@ def ddm_qa(rasters: dict[str, Path], local_range_path: Path, pl_variation_path: 
         "path": local_range_path,
     }
 
-    flags_result = create_pl_variation_mask_flags(
-        rasters["dybde"],
-        variation_mask,
-        pl_variation_path,
-    )
+    if variation_result is not None:
 
-    qa_results["outputs"]["pl_variation"] = flags_result
+        flags_result = create_pl_variation_mask_flags(
+            rasters["dybde"],
+            variation_mask,
+            pl_variation_path,
+        )
 
-    qa_results["outputs"]["pl_variation_areas"] = (
-        pl_variation_areas_result
-    )
+        qa_results["outputs"]["pl_variation"] = flags_result
+
+        qa_results["outputs"]["pl_variation_areas"] = (
+            pl_variation_areas_result
+        )
 
     #=====================================#
     #==         QA OBSERVATIONS         ==#

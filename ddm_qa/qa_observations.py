@@ -140,12 +140,12 @@ def evaluate_local_variation_observations(local_variation: dict) -> list[dict]:
     if variation_pixels is not None:
         observations.append(
             create_observation(
-                code="HIGH_LOCAL_VARIATION",
+                code="PL_LOCAL_VARIATION",
                 status="WARNING",
                 message=("Fandt pixels med lokal variation over den percentile grænse"),
                 value=variation_pixels,
                 details={
-                    "percentile": 95,
+                    "percentile": local_variation.get("percentile"),
                     "threshold": threshold,
                 },
             )
@@ -154,7 +154,7 @@ def evaluate_local_variation_observations(local_variation: dict) -> list[dict]:
     if area_count is not None:
         observations.append(
             create_observation(
-                code="HIGH_VARIATION_AREAS",
+                code="PL_VARIATION_AREAS",
                 status="WARNING",
                 message=("Fandt Sammenhængende områder med lokal variation over den percentile grænse"),
                 value=area_count,
@@ -286,7 +286,7 @@ def evaluate_depth_range_observations(local_variation: dict) -> list[dict]:
 
         observations.append(
             create_observation(
-                code="DEPTH_RANGE_IN_HIGH_VARIATION_AREAS",
+                code="DEPTH_RANGE_IN_PL_VARIATION_AREAS",
                 status="INFO",
                 message=("Udregnede dybde variationen i områder med lokal variation over den percentile grænse"),
                 value=len(areas_with_depth),
