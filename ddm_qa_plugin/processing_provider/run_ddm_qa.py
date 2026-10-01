@@ -1,5 +1,8 @@
 from pathlib import Path
+import math
 import subprocess
+
+from qgis.PyQt.QtGui import QColor
 
 from qgis.core import (
     QgsProcessingAlgorithm,
@@ -9,6 +12,12 @@ from qgis.core import (
     QgsProcessingParameterFolderDestination,
     QgsProcessingParameterRasterDestination,
     QgsProcessingParameterFileDestination,
+    QgsRasterLayer,
+    QgsSingleBandPseudoColorRenderer,
+    QgsColorRampShader,
+    QgsRasterShader,
+    QgsPalettedRasterRenderer,
+    QgsProject,
 )
 
 
@@ -41,7 +50,6 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
     def createInstance(self):
         return RunQaAlgorithm()
 
-    # Definer input/output
     def initAlgorithm(self, config=None):
 
         self.addParameter(
@@ -137,7 +145,214 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-    # Bliver kaldt når man trykker på run i QGIS
+
+    # helper til at finde værdierne for de enklte rastere
+    def _scan_raster_values(self, layer, feedback, ignore_values=None):
+
+        if ignore_values is None:
+            ignore_values = set()
+
+        provider = layer.dataProvider()
+
+        width = layer.width()
+        height = layer.height()
+
+        if width <= 0 or height <= 0:
+            raise QgsProcessingException("Raster has invalid dimensions.")
+
+        block = provider.block(
+            1,
+            layer.extent(),
+            width,
+            height,
+        )
+
+        if block is None:
+            raise QgsProcessingException("Could not read raster block.")
+
+        min_value = None
+        max_value = None
+        unique_values = set()
+
+        for row in range(height):
+
+            if feedback.isCanceled():
+                raise QgsProcessingException("DDM QA was canceled")
+
+            for column in range(width):
+
+                if block.isNoData(row, column):
+                    continue
+
+                value = block.value(row, column)
+
+                if value in ignore_values:
+                    continue
+
+                if isinstance(value, float) and math.isnan(value):
+                    continue
+
+                if min_value is None or value < min_value:
+                    min_value = value
+
+                if max_value is None or value > max_value:
+                    max_value = value
+
+                unique_values.add(value)
+
+        return min_value, max_value, sorted(unique_values)
+
+
+    #=====================================#
+    #==       STYLE HELPER FUNCS        ==#
+    #=====================================#
+
+    def _style_local_range(self, layer, feedback):
+
+        min_value, max_value, _ = self._scan_raster_values(
+            layer,
+            feedback,
+            ignore_values={
+                255,
+                -9999,
+            },
+        )
+
+        if min_value is None or max_value is None:
+            raise QgsProcessingException("Local range contains no valid data.")
+
+        color_ramp = QgsColorRampShader()
+
+        color_ramp.setColorRampType(
+            QgsColorRampShader.Interpolated
+        )
+
+        if min_value == max_value:
+
+            color_ramp.setColorRampItemList([
+                QgsColorRampShader.ColorRampItem(
+                    min_value,
+                    QColor("#6baed6"),
+                    str(min_value),
+                )
+            ])
+
+        else:
+
+            color_ramp.setColorRampItemList([
+                QgsColorRampShader.ColorRampItem(
+                    min_value,
+                    QColor("#d9f0ff"),
+                    str(min_value),
+                ),
+                QgsColorRampShader.ColorRampItem(
+                    max_value,
+                    QColor("#08306b"),
+                    str(max_value),
+                ),
+            ])
+
+        # QgsSingleBandPseudoColorRenderer forventer en QgsRasterShader og ikke direkte en QgsColorRampShader
+        shader = QgsRasterShader()
+
+        shader.setRasterShaderFunction(color_ramp)
+
+        renderer = QgsSingleBandPseudoColorRenderer(
+            layer.dataProvider(),
+            1,
+            shader,
+        )
+
+        layer.setRenderer(renderer)
+        layer.triggerRepaint()
+
+    def _style_pl_variation(self, layer, feedback):
+
+        classes = [
+            QgsPalettedRasterRenderer.Class(
+                0,
+                QColor(0, 0, 0, 0),
+                "Not above percentile",
+            ),
+            QgsPalettedRasterRenderer.Class(
+                1,
+                QColor(217, 217, 217, 51),
+                "Above percentile",
+            ),
+        ]
+
+        renderer = QgsPalettedRasterRenderer(
+            layer.dataProvider(),
+            1,
+            classes,
+        )
+
+        layer.setRenderer(renderer)
+        layer.triggerRepaint()
+
+    def _get_area_color(self, index):
+
+        golden_angle = 0.618033988749895
+
+        hue = (index * golden_angle) % 1.0
+
+        saturation = 0.70
+        value = 0.95
+
+        return QColor.fromHsvF(
+            hue,
+            saturation,
+            value,
+            1.0,
+        )
+
+    def _style_pl_variation_areas(self, layer, feedback):
+
+        _, _, unique_values = self._scan_raster_values(
+            layer,
+            feedback,
+            ignore_values={0},
+        )
+
+        if not unique_values:
+            feedback.pushInfo("PL variation areas contains no areas.")
+            return
+
+        classes = []
+
+        for index, value in enumerate(unique_values):
+
+            if float(value).is_integer():
+                area_value = int(value)
+                label = f"Area {area_value}"
+            else:
+                area_value = value
+                label = f"Area {value}"
+
+            color = self._get_area_color(index)
+
+            classes.append(
+                QgsPalettedRasterRenderer.Class(
+                    area_value,
+                    color,
+                    label,
+                )
+            )
+
+        renderer = QgsPalettedRasterRenderer(
+            layer.dataProvider(),
+            1,
+            classes,
+        )
+
+        layer.setRenderer(renderer)
+        layer.triggerRepaint()
+
+
+    #=====================================#
+    #==             KØR QA              ==#
+    #=====================================#
+
     def processAlgorithm(self, parameters, context, feedback):
 
         dybde = Path(
@@ -203,39 +418,53 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
         qa_script = project_dir / "ddm_qa_cli.py"
 
         if not python_executable.exists():
-            raise QgsProcessingException(
-                f"Python environment not found: {python_executable}"
-            )
+            raise QgsProcessingException(f"Python environment not found: {python_executable}")
 
         if not qa_script.exists():
-            raise QgsProcessingException(
-                f"QA script not found: {qa_script}"
-            )
+            raise QgsProcessingException(f"QA script not found: {qa_script}")
 
         output_dir.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        local_range = Path(self.parameterAsOutputLayer(parameters, self.LOCAL_RANGE, context))
+        local_range = Path(
+            self.parameterAsOutputLayer(
+                parameters,
+                self.LOCAL_RANGE,
+                context,
+            )
+        )
 
-        pl_variation = Path(self.parameterAsOutputLayer(parameters, self.PL_VARIATION, context))
+        pl_variation = Path(
+            self.parameterAsOutputLayer(
+                parameters,
+                self.PL_VARIATION,
+                context,
+            )
+        )
 
-        pl_variation_areas = Path(self.parameterAsOutputLayer(parameters, self.PL_VARIATION_AREAS, context))
+        pl_variation_areas = Path(
+            self.parameterAsOutputLayer(
+                parameters,
+                self.PL_VARIATION_AREAS,
+                context,
+            )
+        )
 
-        result_json = Path(self.parameterAsFileOutput(parameters, self.QA_RESULTS, context))
+        result_json = Path(
+            self.parameterAsFileOutput(
+                parameters,
+                self.QA_RESULTS,
+                context,
+            )
+        )
 
-        report_path = self.parameterAsFileOutput(parameters, self.REPORT_HTML, context)
-
-        feedback.pushInfo(f"Local range output: {local_range}")
-
-        feedback.pushInfo(f"PL variation output: {pl_variation}")
-
-        feedback.pushInfo(f"PL variation areas output: {pl_variation_areas}")
-
-        feedback.pushInfo(f"QA results output: {result_json}")
-
-        feedback.pushInfo(f"QA report output: {report_path}")
+        report_path = self.parameterAsFileOutput(
+            parameters,
+            self.REPORT_HTML,
+            context,
+        )
 
         # fjern python_executable og qa_script og erstat med str(qa_executable),
         command = [
@@ -296,9 +525,7 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             if feedback.isCanceled():
                 process.terminate()
                 process.wait()
-                raise QgsProcessingException(
-                    "DDM QA was canceled"
-                )
+                raise QgsProcessingException("DDM QA was canceled")
 
         return_code = process.wait()
 
@@ -308,6 +535,70 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             )
 
         feedback.pushInfo("DDM QA completed successfully")
+
+
+        #=====================================#
+        #==       LOAD OUTPUT RASTERS       ==#
+        #=====================================#
+
+        feedback.pushInfo("Loading QA rasters...")
+
+        local_range_layer = QgsRasterLayer(
+            str(local_range),
+            "Local range",
+            "gdal",
+        )
+
+        pl_variation_layer = QgsRasterLayer(
+            str(pl_variation),
+            "PL variation",
+            "gdal",
+        )
+
+        pl_variation_areas_layer = QgsRasterLayer(
+            str(pl_variation_areas),
+            "PL variation areas",
+            "gdal",
+        )
+
+        if not local_range_layer.isValid():
+            raise QgsProcessingException(
+                f"Could not load local range raster: "
+                f"{local_range}"
+            )
+
+        if not pl_variation_layer.isValid():
+            raise QgsProcessingException(
+                f"Could not load PL variation raster: "
+                f"{pl_variation}"
+            )
+
+        if not pl_variation_areas_layer.isValid():
+            raise QgsProcessingException(
+                f"Could not load PL variation areas raster: "
+                f"{pl_variation_areas}"
+            )
+
+        #=====================================#
+        #==       TILFØJ RASTER STYLES      ==#
+        #=====================================#
+
+        feedback.pushInfo("Styling output rasters")
+
+        self._style_local_range(local_range_layer, feedback)
+
+        self._style_pl_variation(pl_variation_layer, feedback)
+
+        self._style_pl_variation_areas(pl_variation_areas_layer, feedback)
+
+
+        QgsProject.instance().addMapLayer(local_range_layer)
+
+        QgsProject.instance().addMapLayer(pl_variation_layer)
+
+        QgsProject.instance().addMapLayer(pl_variation_areas_layer)
+
+        feedback.pushInfo("Styled QA rasters added to QGIS.")
 
         return {
             self.LOCAL_RANGE: str(local_range),
