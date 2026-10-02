@@ -999,7 +999,7 @@ def render_report(results: dict, figure_paths: dict) -> str:
     content="width=device-width, initial-scale=1"
 >
 
-<title>HydroQA – QA Report</title>
+<title>DDM – QA Report</title>
 
 <style>
 
@@ -1292,9 +1292,9 @@ pre {{
 
 <!-- ==================================== Titel og Undertitel ==================================== -->
 
-<h1>HydroQA – QA Report</h1>
+<h1>QA Report</h1>
 
-<p class="subtitle">Reproducerbar kvalitetskontrol af Digital Depth Model (DDM)</p>
+<p class="subtitle">Reproducerbar kvalitetskontrol af Danmarks Dybde Model (DDM)</p>
 
 
 
@@ -1341,10 +1341,11 @@ pre {{
 
 <section class="section">
 
-    <h2>Lokal variation</h2>
+    <h2>Lokal Variation</h2>
 
     <p>
-        ###########################UNDER RUBRIK###############################
+       Analyse af lokale dybdeforskelle baseret på variation mellem naboceller. 
+       Pixels over den beregnede percentilgrænse markeres som potentielt interessante områder og grupperes efter valgt connectivity.
     </p>
 
     <div class="figure">
@@ -1354,7 +1355,7 @@ pre {{
         >
 
         <div class="figure-caption">
-            #########################FIGUR TEKST############################## 
+            Potentielt intressante områder er mærkeret med hver deres unikke farve.
         </div>
 
     </div>
@@ -1496,6 +1497,48 @@ pre {{
 
 
 
+<!-- ==================================== fordeling af datakilder Søjlediagram ==================================== -->
+
+<section class="section">
+
+    <h2>Datakilder</h2>
+
+    <div class="figure">
+
+        <img
+            src="{escape(source_src)}"
+            alt="Graf over fordeling af datakilder"
+        >
+
+        <div class="figure-caption">
+            Fordeling af kildekoder blandt gyldige kildepixels.
+        </div>
+
+    </div>
+
+
+    <table>
+
+        <thead>
+
+            <tr>
+                <th>Kildekode</th>
+                <th>Pixels</th>
+                <th>Andel</th>
+            </tr>
+
+        </thead>
+
+        <tbody>
+            {render_source_distribution(input_inspection)}
+        </tbody>
+
+    </table>
+
+</section>
+
+
+
 <!-- ==================================== Datakomplethed Søjlediagram ==================================== -->
 
 <section class="section">
@@ -1531,48 +1574,6 @@ pre {{
 
         <tbody>
             {render_completeness_table(input_inspection)}
-        </tbody>
-
-    </table>
-
-</section>
-
-
-
-<!-- ==================================== fordeling af datakilder Søjlediagram ==================================== -->
-
-<section class="section">
-
-    <h2>Datakilder</h2>
-
-    <div class="figure">
-
-        <img
-            src="{escape(source_src)}"
-            alt="Graf over fordeling af datakilder"
-        >
-
-        <div class="figure-caption">
-            Fordeling af kildekoder blandt gyldige kildepixels.
-        </div>
-
-    </div>
-
-
-    <table>
-
-        <thead>
-
-            <tr>
-                <th>Kildekode</th>
-                <th>Pixels</th>
-                <th>Andel</th>
-            </tr>
-
-        </thead>
-
-        <tbody>
-            {render_source_distribution(input_inspection)}
         </tbody>
 
     </table>
@@ -1620,7 +1621,7 @@ pre {{
 
 <section class="section">
 
-    <h2>Producerede outputs</h2>
+    <h2>Producerede Outputs</h2>
 
     <table>
 
@@ -1650,27 +1651,18 @@ pre {{
 
 <section class="section">
 
-    <h2>Forbehold</h2>
+<section class="section">
+
+    <h2>QA Forbehold</h2>
 
     <p>
-        QA-workflowet har identificeret tekniske kontroller,
-        datakomplethed, kilde- og årssammenhænge samt områder med
-        høj lokal variation. Resultaterne bruges som screeningsgrundlag
-        for videre undersøgelse af DDM'et.
-    </p>
-
-    <p>
-        Workflowet bør ikke anvendes til automatisk at klassificere
-        identificerede områder som fejl uden yderligere kontrol mod
-        originale data, metadata og eventuel survey-dokumentation.
+        QA-workflowet gennemfører tekniske kontroller af datakomplethed,
+        kilde- og årssammenhænge samt identificerer områder med høj
+        lokal variation. Resultaterne skal anvendes som screeningsgrundlag
+        for videre undersøgelse af Danmarks Dybde Model (DDM).
     </p>
 
     <ul>
-
-        <li>
-            QA-workflowet identificerer områder til nærmere undersøgelse,
-            men afgør ikke alene, om et område indeholder en fejl.
-        </li>
 
         <li>
             Høj lokal variation afhænger af den valgte percentilgrænse
@@ -1678,19 +1670,13 @@ pre {{
         </li>
 
         <li>
-            Dybderange beskrives, men der anvendes ikke en arbitrær
-            grænseværdi til at klassificere en dybderange som fejl.
+            Måleusikkerhed og kvaliteten af den underliggende opmåling
+            kan ikke bestemmes pålideligt ud fra dybderasteren alene.
         </li>
 
         <li>
-            Måleusikkerhed og survey quality kan ikke bestemmes
-            pålideligt ud fra dybderasteren alene.
-        </li>
-
-        <li>
-            Manglende kildeår registreres som et QA-signal, men
-            årsagen til manglen skal undersøges i den oprindelige
-            datadokumentation.
+            Manglende kildeår registreres som et QA-signal, men årsagen
+            til manglen skal undersøges i den oprindelige datadokumentation.
         </li>
 
     </ul>
