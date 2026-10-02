@@ -1294,7 +1294,7 @@ pre {{
 
 <h1>QA Report</h1>
 
-<p class="subtitle">Reproducerbar kvalitetskontrol af Danmarks Dybde Model (DDM)</p>
+<p class="subtitle">Reproducerbar kvalitetskontrol af Danmarks Dybdemodel (DDM)</p>
 
 
 
@@ -1659,7 +1659,7 @@ pre {{
         QA-workflowet gennemfører tekniske kontroller af datakomplethed,
         kilde- og årssammenhænge samt identificerer områder med høj
         lokal variation. Resultaterne skal anvendes som screeningsgrundlag
-        for videre undersøgelse af Danmarks Dybde Model (DDM).
+        for videre undersøgelse af Danmarks Dybdemodel (DDM).
     </p>
 
     <ul>
