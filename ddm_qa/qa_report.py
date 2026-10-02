@@ -13,12 +13,9 @@ import rasterio
 
 
 def escape(value) -> str:
-    """Gør tekst sikker at indsætte i HTML."""
     return html.escape(str(value))
 
-
 def format_number(value, decimals=2) -> str:
-    """Formaterer tal pænt i rapporten."""
     if value is None:
         return "—"
 
@@ -27,9 +24,7 @@ def format_number(value, decimals=2) -> str:
 
     return f"{value:,}"
 
-
 def status_class(status: str) -> str:
-    """Returnerer CSS-klassen for en observationstatus."""
     return {
         "PASS": "pass",
         "INFO": "info",
@@ -37,11 +32,8 @@ def status_class(status: str) -> str:
         "FAIL": "fail",
     }.get(status, "unknown")
 
+def build_status_summary(observations: list[dict]) -> dict:
 
-def build_status_summary(
-    observations: list[dict],
-) -> dict:
-    """Tæller observationer pr. status."""
     summary = {
         "PASS": 0,
         "INFO": 0,
@@ -57,67 +49,16 @@ def build_status_summary(
 
     return summary
 
-
 def render_status_badge(status: str) -> str:
-    """Renderer en status som en badge."""
+
     return (
         f'<span class="status {status_class(status)}">'
         f"{escape(status)}"
         "</span>"
     )
 
+def render_completeness_table(input_inspection: dict) -> str:
 
-def render_validation_table(
-    input_validation: dict,
-) -> str:
-    """Renderer inputvalideringen som HTML-tabel."""
-    rows = []
-
-    for name, result in input_validation.items():
-        status = result.get(
-            "status",
-            "UNKNOWN",
-        )
-
-        message = result.get(
-            "message",
-            "",
-        )
-
-        details = []
-
-        for key, value in result.items():
-            if key in {
-                "status",
-                "message",
-            }:
-                continue
-
-            details.append(
-                f"<strong>{escape(key)}:</strong> "
-                f"{escape(value)}"
-            )
-
-        detail_text = "<br>".join(details)
-
-        rows.append(
-            f"""
-            <tr>
-                <td>{escape(name)}</td>
-                <td>{render_status_badge(status)}</td>
-                <td>{escape(message)}</td>
-                <td>{detail_text}</td>
-            </tr>
-            """
-        )
-
-    return "\n".join(rows)
-
-
-def render_completeness_table(
-    input_inspection: dict,
-) -> str:
-    """Renderer datakomplethed som HTML-tabel."""
     rows = []
 
     names = {
@@ -166,11 +107,8 @@ def render_completeness_table(
 
     return "\n".join(rows)
 
+def render_source_distribution(input_inspection: dict) -> str:
 
-def render_source_distribution(
-    input_inspection: dict,
-) -> str:
-    """Renderer kildefordelingen som HTML-tabel."""
     source = input_inspection.get(
         "kilde",
         {},
@@ -215,11 +153,8 @@ def render_source_distribution(
 
     return "\n".join(rows)
 
+def render_observations(observations: list[dict]) -> str:
 
-def render_observations(
-    observations: list[dict],
-) -> str:
-    """Renderer QA-observationer som HTML-tabel."""
     rows = []
 
     for observation in observations:
@@ -288,11 +223,8 @@ def render_observations(
 
     return "\n".join(rows)
 
+def render_metadata_table( metadata: dict) -> str:
 
-def render_metadata_table(
-    metadata: dict,
-) -> str:
-    """Renderer rastermetadata som HTML-tabel."""
     rows = []
 
     for raster_name, raster in metadata.items():
@@ -346,9 +278,8 @@ def render_metadata_table(
 
     return "\n".join(rows)
 
-
 def render_outputs(outputs: dict) -> str:
-    """Renderer producerede outputfiler."""
+
     rows = []
 
     for name, result in outputs.items():
@@ -398,12 +329,8 @@ def render_outputs(outputs: dict) -> str:
 
     return "\n".join(rows)
 
+def create_completeness_figure(input_inspection: dict, figure_path: Path) -> None:
 
-def create_completeness_figure(
-    input_inspection: dict,
-    figure_path: Path,
-) -> None:
-    """Opretter graf over datakomplethed."""
     names = {
         "dybde": "Dybde",
         "kilde": "Kilde",
@@ -478,12 +405,8 @@ def create_completeness_figure(
 
     plt.close(fig)
 
+def create_source_distribution_figure(input_inspection: dict, figure_path: Path) -> None:
 
-def create_source_distribution_figure(
-    input_inspection: dict,
-    figure_path: Path,
-) -> None:
-    """Opretter graf over kildefordelingen."""
     source = input_inspection.get(
         "kilde",
         {},
@@ -551,12 +474,8 @@ def create_source_distribution_figure(
 
     plt.close(fig)
 
+def create_observation_figure(observations: list[dict], figure_path: Path) -> None:
 
-def create_observation_figure(
-    observations: list[dict],
-    figure_path: Path,
-) -> None:
-    """Opretter graf over antal observationer pr. status."""
     summary = build_status_summary(
         observations
     )
@@ -618,19 +537,7 @@ def create_observation_figure(
 
     plt.close(fig)
 
-
-def create_high_variation_figure(
-    results: dict,
-    local_range_path: Path,
-    pl_variation_areas_path: Path,
-    figure_path: Path,
-) -> None:
-    """
-    Opretter et samlet QA-kort med:
-
-    - local range som baggrund
-    - lokal variation områder som overlay
-    """
+def create_high_variation_figure(results: dict, local_range_path: Path, pl_variation_areas_path: Path, figure_path: Path) -> None:
 
     if not local_range_path.is_file():
         raise FileNotFoundError(
@@ -902,14 +809,7 @@ def create_high_variation_figure(
 
     plt.close(fig)
 
-
-def create_figures(
-    results: dict,
-    figure_dir: Path,
-    local_range_path: Path,
-    pl_variation_areas_path: Path,
-) -> dict:
-    """Opretter alle rapportens figurer."""
+def create_figures(results: dict, figure_dir: Path, local_range_path: Path, pl_variation_areas_path: Path) -> dict:
 
     figure_dir.mkdir(
         parents=True,
@@ -971,12 +871,7 @@ def create_figures(
         "high_variation_areas": high_variation_path,
     }
 
-
-def render_report(
-    results: dict,
-    figure_paths: dict,
-) -> str:
-    """Bygger hele HTML-rapporten."""
+def render_report(results: dict, figure_paths: dict) -> str:
 
     observations = results.get(
         "observations",
@@ -1051,9 +946,7 @@ def render_report(
         ]
     ).parent.parent
 
-    def relative_figure_path(
-        figure_path: Path,
-    ) -> str:
+    def relative_figure_path(figure_path: Path) -> str:
         return str(
             Path(figure_path).relative_to(
                 report_dir
@@ -1130,7 +1023,7 @@ def render_report(
 body {{
     margin: 0;
 
-    background: var(--background);
+    background: var(--background);<!-- Dette er en kommentar -->
     color: var(--text);
 
     font-family:
@@ -1397,517 +1290,412 @@ pre {{
 
 <main>
 
+<!-- ==================================== Titel og Undertitel ==================================== -->
 
 <h1>HydroQA – QA Report</h1>
 
-<p class="subtitle">
-Reproducerbar kvalitetskontrol af Digital Depth Model (DDM)
-</p>
+<p class="subtitle">Reproducerbar kvalitetskontrol af Digital Depth Model (DDM)</p>
 
 
-<section class="section">
 
-<h2>Formål</h2>
-
-<p>
-Formålet er at udvikle en reproducerbar QA-workflow, der kan
-identificere og beskrive områder i DDM'et, hvor datastruktur,
-datakomplethed eller rumlig variation indikerer, at data bør
-undersøges nærmere.
-</p>
-
-<p>
-Rapporten beskriver QA-resultaterne og skal ikke fortolkes som
-et bevis på, at identificerede områder indeholder fejl.
-</p>
-
-</section>
-
+<!-- ==================================== Inputvalidering hurtig oversigt ==================================== -->
 
 <section class="summary">
 
-<div class="summary-card pass">
+    <div class="summary-card pass">
 
-<div class="number">
-{summary["PASS"]}
-</div>
+        <div class="number">{summary["PASS"]}</div>
 
-<div class="label">
-PASS
-</div>
+        <div class="label">PASS</div>
 
-</div>
+    </div>
 
+    <div class="summary-card info">
 
-<div class="summary-card info">
+        <div class="number">{summary["INFO"]}</div>
 
-<div class="number">
-{summary["INFO"]}
-</div>
+        <div class="label">INFO</div>
 
-<div class="label">
-INFO
-</div>
-
-</div>
+    </div>
 
 
-<div class="summary-card warning">
+    <div class="summary-card warning">
 
-<div class="number">
-{summary["WARNING"]}
-</div>
+        <div class="number">{summary["WARNING"]}</div>
 
-<div class="label">
-WARNING
-</div>
+        <div class="label">WARNING</div>
 
-</div>
+    </div>
 
+    <div class="summary-card fail">
 
-<div class="summary-card fail">
+        <div class="number">{summary["FAIL"]}</div>
 
-<div class="number">
-{summary["FAIL"]}
-</div>
-
-<div class="label">
-FAIL
-</div>
-
-</div>
+        <div class="label">FAIL</div>
+    
+    </div>
 
 </section>
 
+<!-- ==================================== raster output  ==================================== -->
 
 <section class="section">
 
-<h2>1. Inputvalidering</h2>
+    <h2>Lokal variation</h2>
 
-<table>
+    <p>
+        ###########################UNDER RUBRIK###############################
+    </p>
 
-<thead>
+    <div class="figure">
 
-<tr>
-<th>Kontrol</th>
-<th>Status</th>
-<th>Resultat</th>
-<th>Detaljer</th>
-</tr>
+        <img
+            src="{escape(high_variation_src)}"
+        >
 
-</thead>
+        <div class="figure-caption">
+            #########################FIGUR TEKST############################## 
+        </div>
 
-<tbody>
+    </div>
 
-{render_validation_table(
-    input_validation
-)}
+    <table>
 
-</tbody>
+        <tr>
+            <th>Parameter</th>
+            <th>Værdi</th>
+        </tr>
 
-</table>
+        <tr>
+
+            <td>
+                Gyldige lokal-range pixels
+            </td>
+
+            <td>
+                {format_number(
+                    statistics.get(
+                        "valid_pixels"
+                    ),
+                    0
+                )}
+            </td>
+
+        </tr>
+
+        <tr>
+
+            <td>
+                {percentile_label} tærskel
+            </td>
+
+            <td>
+                {format_number(threshold)}
+            </td>
+
+        </tr>
+
+        <tr>
+
+            <td>
+                Pixels med høj lokal variation
+            </td>
+
+            <td>
+                {format_number(
+                    analysis.get(
+                        "variation_mask_pixels"
+                    ),
+                    0
+                )}
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Sammenhængende områder
+            </td>
+
+            <td>
+                {format_number(
+                    areas.get(
+                        "count"
+                    ),
+                    0
+                )}
+            </td>
+
+        </tr>
+
+
+        <tr>
+
+            <td>
+                Connectivity
+            </td>
+
+            <td>
+                {escape(
+                    areas.get(
+                        "connectivity",
+                        "—"
+                    )
+                )}
+            </td>
+
+        </tr>
+
+    </table>
+
+
+    <div class="limitation">
+
+        <strong>Fortolkning:</strong>
+
+        Høj lokal variation er et screeningssignal og er ikke i sig selv
+        dokumentation for en fejl i DDM dataen
+
+    </div>
 
 </section>
 
+
+
+<!-- ==================================== Overstigt over observationer  ==================================== -->
 
 <section class="section">
 
-<h2>2. Datakomplethed</h2>
+<h2>QA-observationer</h2>
 
-<div class="figure">
+    <table>
 
-<img
-    src="{escape(completeness_src)}"
-    alt="Graf over datakomplethed"
->
+        <thead>
 
-<div class="figure-caption">
-Datakomplethed for de tre inputrasters.
-</div>
+            <tr>
+                <th>Kode</th>
+                <th>Status</th>
+                <th>Observation</th>
+                <th>Værdi</th>
+                <th>Detaljer</th>
+            </tr>
 
-</div>
+        </thead>
 
+        <tbody>
 
-<table>
+            {render_observations(observations)}
 
-<thead>
+        </tbody>
 
-<tr>
-<th>Raster</th>
-<th>Total pixels</th>
-<th>Gyldige pixels</th>
-<th>NoData pixels</th>
-<th>Gyldig data</th>
-</tr>
-
-</thead>
-
-<tbody>
-
-{render_completeness_table(
-    input_inspection
-)}
-
-</tbody>
-
-</table>
+    </table>
 
 </section>
 
+
+
+<!-- ==================================== Datakomplethed Søjlediagram ==================================== -->
 
 <section class="section">
 
-<h2>3. Datakilder</h2>
+    <h2>Datakomplethed</h2>
 
-<div class="figure">
+    <div class="figure">
 
-<img
-    src="{escape(source_src)}"
-    alt="Graf over fordeling af datakilder"
->
+        <img
+            src="{escape(completeness_src)}"
+            alt="Graf over datakomplethed"
+        >
 
-<div class="figure-caption">
-Fordeling af kildekoder blandt gyldige kildepixels.
-</div>
+        <div class="figure-caption">
+            Datakomplethed for de tre inputrasters.
+        </div>
 
-</div>
+    </div>
 
+    <table>
 
-<table>
+        <thead>
 
-<thead>
+            <tr>
+                <th>Raster</th>
+                <th>Total pixels</th>
+                <th>Gyldige pixels</th>
+                <th>NoData pixels</th>
+                <th>Gyldig data</th>
+            </tr>
 
-<tr>
-<th>Kildekode</th>
-<th>Pixels</th>
-<th>Andel</th>
-</tr>
+        </thead>
 
-</thead>
+        <tbody>
+            {render_completeness_table(input_inspection)}
+        </tbody>
 
-<tbody>
-
-{render_source_distribution(
-    input_inspection
-)}
-
-</tbody>
-
-</table>
+    </table>
 
 </section>
 
+
+
+<!-- ==================================== fordeling af datakilder Søjlediagram ==================================== -->
 
 <section class="section">
 
-<h2>4. Lokal variation</h2>
+    <h2>Datakilder</h2>
 
-<p>
-Der er beregnet lokal dybdevariation med et 3×3-vindue.
-Områder over den valgte percentilgrænse er identificeret som
-screeningsområder.
-</p>
+    <div class="figure">
 
-<div class="figure">
+        <img
+            src="{escape(source_src)}"
+            alt="Graf over fordeling af datakilder"
+        >
 
-<img
-    src="{escape(high_variation_src)}"
-    alt="Kort over identificerede områder med høj lokal variation"
->
+        <div class="figure-caption">
+            Fordeling af kildekoder blandt gyldige kildepixels.
+        </div>
 
-<div class="figure-caption">
-Identificerede områder med høj lokal variation.
-Område-ID svarer til ID'erne i QA-resultaterne.
-</div>
-
-</div>
+    </div>
 
 
-<table>
+    <table>
 
-<tr>
-<th>Parameter</th>
-<th>Værdi</th>
-</tr>
+        <thead>
 
+            <tr>
+                <th>Kildekode</th>
+                <th>Pixels</th>
+                <th>Andel</th>
+            </tr>
 
-<tr>
+        </thead>
 
-<td>
-Gyldige lokal-range pixels
-</td>
+        <tbody>
+            {render_source_distribution(input_inspection)}
+        </tbody>
 
-<td>
-{format_number(
-    statistics.get(
-        "valid_pixels"
-    ),
-    0
-)}
-</td>
-
-</tr>
-
-
-<tr>
-
-<td>
-{percentile_label} tærskel
-</td>
-
-<td>
-{format_number(
-    threshold
-)}
-</td>
-
-</tr>
-
-
-<tr>
-
-<td>
-Pixels med høj lokal variation
-</td>
-
-<td>
-{format_number(
-    analysis.get(
-        "variation_mask_pixels"
-    ),
-    0
-)}
-</td>
-
-</tr>
-
-
-<tr>
-
-<td>
-Sammenhængende områder
-</td>
-
-<td>
-{format_number(
-    areas.get(
-        "count"
-    ),
-    0
-)}
-</td>
-
-</tr>
-
-
-<tr>
-
-<td>
-Connectivity
-</td>
-
-<td>
-{escape(
-    areas.get(
-        "connectivity",
-        "—"
-    )
-)}
-</td>
-
-</tr>
-
-</table>
-
-
-<div class="limitation">
-
-<strong>Fortolkning:</strong>
-
-Høj lokal variation er et screeningssignal og er ikke i sig selv
-dokumentation for en fejl i DDM'et.
-
-</div>
+    </table>
 
 </section>
 
+
+
+<!-- ==================================== Overstigt over metadata  ==================================== -->
 
 <section class="section">
 
-<h2>5. QA-observationer</h2>
+    <h2>Metadata</h2>
 
-<div class="figure">
+    <table>
 
-<img
-    src="{escape(observation_src)}"
-    alt="Graf over QA-observationer"
->
+        <thead>
 
-<div class="figure-caption">
-Antal QA-observationer fordelt efter status.
-</div>
+            <tr>
+                <th>Raster</th>
+                <th>Format</th>
+                <th>Datatype</th>
+                <th>CRS</th>
+                <th>Beskrivelse</th>
+                <th>Enhed</th>
+                <th>Software</th>
+                <th>Dato</th>
+            </tr>
 
-</div>
+        </thead>
 
+        <tbody>
 
-<table>
+            {render_metadata_table(metadata)}
 
-<thead>
+        </tbody>
 
-<tr>
-<th>Kode</th>
-<th>Status</th>
-<th>Observation</th>
-<th>Værdi</th>
-<th>Detaljer</th>
-</tr>
-
-</thead>
-
-<tbody>
-
-{render_observations(
-    observations
-)}
-
-</tbody>
-
-</table>
+    </table>
 
 </section>
 
+
+
+<!-- ==================================== Rasteroutput oversig  ==================================== -->
 
 <section class="section">
 
-<h2>6. Metadata</h2>
+    <h2>Producerede outputs</h2>
 
-<table>
+    <table>
 
-<thead>
+        <thead>
 
-<tr>
-<th>Raster</th>
-<th>Format</th>
-<th>Datatype</th>
-<th>CRS</th>
-<th>Beskrivelse</th>
-<th>Enhed</th>
-<th>Software</th>
-<th>Dato</th>
-</tr>
+            <tr>
+                <th>Output</th>
+                <th>Fil</th>
+                <th>Resultat</th>
+            </tr>
 
-</thead>
+        </thead>
 
-<tbody>
+        <tbody>
 
-{render_metadata_table(
-    metadata
-)}
+        {render_outputs(outputs)}
 
-</tbody>
+        </tbody>
 
-</table>
-
-
-<div class="limitation">
-
-<strong>Metadata-begrænsning:</strong>
-
-De tekniske rastermetadata dokumenterer ikke nødvendigvis
-survey-metode, vertikal usikkerhed, horisontal usikkerhed eller
-den fulde processing/QC-historik. Disse forhold kan derfor ikke
-vurderes ud fra GeoTIFF-metadata alene.
-
-</div>
+    </table>
 
 </section>
 
+
+
+<!-- ==================================== Afslutende bemærkning  ==================================== -->
 
 <section class="section">
 
-<h2>7. Producerede outputs</h2>
+    <h2>Forbehold</h2>
 
-<table>
+    <p>
+        QA-workflowet har identificeret tekniske kontroller,
+        datakomplethed, kilde- og årssammenhænge samt områder med
+        høj lokal variation. Resultaterne bruges som screeningsgrundlag
+        for videre undersøgelse af DDM'et.
+    </p>
 
-<thead>
+    <p>
+        Workflowet bør ikke anvendes til automatisk at klassificere
+        identificerede områder som fejl uden yderligere kontrol mod
+        originale data, metadata og eventuel survey-dokumentation.
+    </p>
 
-<tr>
-<th>Output</th>
-<th>Fil</th>
-<th>Resultat</th>
-</tr>
+    <ul>
 
-</thead>
+        <li>
+            QA-workflowet identificerer områder til nærmere undersøgelse,
+            men afgør ikke alene, om et område indeholder en fejl.
+        </li>
 
-<tbody>
+        <li>
+            Høj lokal variation afhænger af den valgte percentilgrænse
+            og skal derfor fortolkes relativt til det analyserede datasæt.
+        </li>
 
-{render_outputs(
-    outputs
-)}
+        <li>
+            Dybderange beskrives, men der anvendes ikke en arbitrær
+            grænseværdi til at klassificere en dybderange som fejl.
+        </li>
 
-</tbody>
+        <li>
+            Måleusikkerhed og survey quality kan ikke bestemmes
+            pålideligt ud fra dybderasteren alene.
+        </li>
 
-</table>
+        <li>
+            Manglende kildeår registreres som et QA-signal, men
+            årsagen til manglen skal undersøges i den oprindelige
+            datadokumentation.
+        </li>
 
-</section>
-
-
-<section class="section">
-
-<h2>8. Begrænsninger</h2>
-
-<ul>
-
-<li>
-QA-workflowet identificerer områder til nærmere undersøgelse,
-men afgør ikke alene, om et område indeholder en fejl.
-</li>
-
-<li>
-Høj lokal variation afhænger af den valgte percentilgrænse
-og skal derfor fortolkes relativt til det analyserede datasæt.
-</li>
-
-<li>
-Dybderange beskrives, men der anvendes ikke en arbitrær
-grænseværdi til at klassificere en dybderange som fejl.
-</li>
-
-<li>
-Måleusikkerhed og survey quality kan ikke bestemmes
-pålideligt ud fra dybderasteren alene.
-</li>
-
-<li>
-Manglende kildeår registreres som et QA-signal, men
-årsagen til manglen skal undersøges i den oprindelige
-datadokumentation.
-</li>
-
-</ul>
+    </ul>
 
 </section>
-
-
-<section class="section">
-
-<h2>9. Konklusion</h2>
-
-<p>
-QA-workflowet har identificeret tekniske kontroller,
-datakomplethed, kilde- og årssammenhænge samt områder med
-høj lokal variation. Resultaterne bruges som screeningsgrundlag
-for videre undersøgelse af DDM'et.
-</p>
-
-<p>
-Workflowet bør ikke anvendes til automatisk at klassificere
-identificerede områder som fejl uden yderligere kontrol mod
-originale data, metadata og eventuel survey-dokumentation.
-</p>
-
-</section>
-
 
 </main>
 
@@ -1917,38 +1705,7 @@ originale data, metadata og eventuel survey-dokumentation.
 """
 
 
-def generate_report(
-    results: dict,
-    report_path: Path,
-    figure_dir: Path,
-    local_range_path: Path,
-    pl_variation_areas_path: Path,
-) -> dict:
-    """
-    Genererer HTML-rapport og rapportfigurer.
-
-    Parameters
-    ----------
-    results:
-        QA-resultatet fra ddm_qa().
-
-    report_path:
-        Path til den færdige HTML-rapport.
-
-    figure_dir:
-        Mappe hvor rapportens figurer gemmes.
-
-    local_range_path:
-        Produceret local-range raster.
-
-    pl_variation_areas_path:
-        Produceret raster med identificerede variation areas.
-
-    Returns
-    -------
-    dict
-        Paths til rapport og figurer.
-    """
+def generate_report(results: dict, report_path: Path, figure_dir: Path, local_range_path: Path, pl_variation_areas_path: Path) -> dict:
 
     report_path = Path(report_path)
     figure_dir = Path(figure_dir)
