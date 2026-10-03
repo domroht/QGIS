@@ -162,7 +162,23 @@ CLI'en fungerer som et separat interface til `ddm_qa()` og gør det muligt at k�
 
 ---
 
-## QGIS Processing
+### Plugin
+
+QA-logikken kan køres direkte i QGIS som et plugin.
+
+* **GitHub release (Linux):** ZIP-filen kan downloades og installeres direkte i QGIS.
+* **Development (Linux):** Pluginet kan køres direkte fra projektmappen ved at starte QGIS med:
+
+```bash
+QGIS_PLUGINPATH=/path/to/project/folder/qgis qgis
+```
+
+Herefter kan **DDM QA** bruges under QGIS' Processing værktøjer.
+
+
+---
+
+### QGIS Processing:
 
 Når pluginet er installeret, findes algoritmen under QGIS Processing:
 

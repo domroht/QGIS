@@ -7,3 +7,8 @@ data/
 output/
 *.qgz
 *pytest_cache
+build/
+dist/
+*.pyc
+ddm_qa_plugin/bin/ddm_qa
+*.zip

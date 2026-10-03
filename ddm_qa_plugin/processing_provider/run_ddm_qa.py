@@ -1,6 +1,7 @@
 from pathlib import Path
 import math
 import subprocess
+import os
 
 from qgis.PyQt.QtGui import QColor
 
@@ -402,18 +403,6 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
         plugin_dir = Path(__file__).resolve().parents[1]
         project_dir = plugin_dir.parent
 
-        """
-        qa_executable = project_dir / "dist" / "ddm_qa"
-
-        if not qa_executable.exists():
-            raise QgsProcessingException(
-                f"DDM QA executable not found: {qa_executable}"
-            )
-
-
-        erstat nedenstående med dette senere (efter pyinstaller build)
-        """
-
         python_executable = project_dir / ".venv" / "bin" / "python"
         qa_script = project_dir / "ddm_qa_cli.py"
 
@@ -422,7 +411,12 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
 
         if not qa_script.exists():
             raise QgsProcessingException(f"QA script not found: {qa_script}")
+        """
+        Inden pyinstealler erstat ovenstående 'python_executable =' og 'qa_script =' + safty checksne med nedenståedne:
 
+        plugin_dir = Path(__file__).resolve().parents[1]
+        qa_executable = plugin_dir / "bin" / "ddm_qa"
+        """ 
         output_dir.mkdir(
             parents=True,
             exist_ok=True,
@@ -466,10 +460,19 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
             context,
         )
 
-        # fjern python_executable og qa_script og erstat med str(qa_executable),
+        """
+        Inden man bruger pyinstaller skal:
+
+            str(python_executable),
+            str(qa_script), 
+        
+        erstattes med:
+
+            str(qa_executable),
+        """
         command = [
             str(python_executable),
-            str(qa_script),
+            str(qa_script), 
             "--dybde",
             str(dybde),
             "--kilde",
@@ -493,18 +496,36 @@ class RunQaAlgorithm(QgsProcessingAlgorithm):
         ]
 
         feedback.pushInfo("Starting DDM QA engine...")
-
-        """
-        feedback.pushInfo(f"Executable: {qa_executable}")
-
-        erstat de to nedenstående med feedback.pushinfo senerer
-        """
-
+    
         feedback.pushInfo(f"Python: {python_executable}")
 
         feedback.pushInfo(f"Script: {qa_script}")
 
         feedback.pushInfo("Running QA...")
+        
+        """
+        inden man bruger pyinstaller skal de 3 ovenstående linjer erstattes med dette:
+
+        feedback.pushInfo(f"Exacutable: {qa_executable}")
+
+        feedback.pushInfo("Running QA...")
+
+        if not qa_executable.is_file():
+            raise QgsProcessingException(
+                f"DDM QA executable blev ikke fundet: {qa_executable}"
+            )
+
+        if not os.access(qa_executable, os.X_OK):
+            try:
+                qa_executable.chmod(
+                    qa_executable.stat().st_mode | 0o111
+                )
+            except OSError as e:
+                raise QgsProcessingException(
+                    f"Kunne ikke gøre DDM QA executable kørbar: "
+                    f"{qa_executable}\n{e}"
+                )
+        """
 
         # start comando output og fejl skal ske i samme log
         process = subprocess.Popen(
