@@ -1,11 +1,19 @@
-CREATE TABLE IF NOT EXISTS activities (
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+
+CREATE TABLE IF NOT EXISTS routes (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name TEXT,
-    activity_date TIMESTAMPTZ,
-    route GEOMETRY(LineString, 4326),
+
+    name TEXT NOT NULL,
+
+    route_hash TEXT NOT NULL UNIQUE,
+
+    route GEOMETRY(LineString, 4326) NOT NULL,
+
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS activities_route_idx
-ON activities
+
+CREATE INDEX IF NOT EXISTS routes_route_idx
+ON routes
 USING GIST (route);
