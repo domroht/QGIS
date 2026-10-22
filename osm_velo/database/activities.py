@@ -1,9 +1,7 @@
 import json
 import psycopg
 
-
-DATABASE_URL = "postgresql://postgres@localhost:5432/geotrack"
-
+DATABASE_URL = "postgresql://postgres@localhost:5432/osmvelo"
 
 def save_activity(name, activity_data, gps_points, file_hash):
 
