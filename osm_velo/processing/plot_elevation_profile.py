@@ -7,7 +7,7 @@ OUTPUT_FILE = "data/output/elevation_profile.png"
 
 def read_profile() -> tuple[list[float], list[float]]:
     dist: list[float] = []
-    elev:list[float] = []
+    elev: list[float] = []
     skipped_rows = 0
 
     with open(INPUT_FILE, "r", encoding="utf-8") as file:
@@ -30,9 +30,6 @@ def read_profile() -> tuple[list[float], list[float]]:
     return dist, elev
 
 def plot_elev_to_dist(dist: list[float], elev: list[float]) -> None:
-
-    if dist is None or elev is None:
-        raise ValueError("ERROR: 'dist' or 'elev' is None")
 
     if not dist or not elev: 
         raise ValueError("ERROR: 'dist' or 'elev' is empty")

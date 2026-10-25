@@ -9,13 +9,8 @@ MIN_HILL_LENGTH_M = 50.0
 
 ELEVATION_NOISE_THRESHOLD_M = 0.5
 
-
-def get_connection():
-    return psycopg2.connect(DATABASE_URL)
-
-
-def ensure_route_stats_table():
-    conn = get_connection()
+def ensure_route_stats_table() -> None:
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
         with conn.cursor() as cur:
@@ -46,9 +41,8 @@ def ensure_route_stats_table():
     finally:
         conn.close()
 
-
-def get_route_points():
-    conn = get_connection()
+def get_route_points() -> list[tuple[int, float, float, float]]:
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
         with conn.cursor() as cur:
@@ -69,8 +63,7 @@ def get_route_points():
     finally:
         conn.close()
 
-
-def calculate_elevation_gain_loss(points):
+def calculate_elevation_gain_loss(points: list[tuple[int, float, float, float]]) -> float, float:
     total_gain = 0.0
     total_loss = 0.0
 
@@ -90,8 +83,8 @@ def calculate_elevation_gain_loss(points):
 
     return total_gain, total_loss
 
+def calculate_basic_stats(points: list[tuple[int, float, float, float]]) -> dict:
 
-def calculate_basic_stats(points):
     elevations = [p[2] for p in points]
 
     total_gain, total_loss = calculate_elevation_gain_loss(points)
@@ -117,7 +110,7 @@ def calculate_basic_stats(points):
     }
 
 
-def find_hills(points):
+def find_hills(points: list[tuple[int, float, float, float]]) -> list:
     hills = []
 
     current_type = None
@@ -139,13 +132,10 @@ def find_hills(points):
         if direction != current_type:
 
             if current_type is not None and start_point is not None:
-                length = (
-                    end_point[1] - start_point[1]
-                )
+                
+                length = (end_point[1] - start_point[1])
 
-                elevation_change = (
-                    end_point[2] - start_point[2]
-                )
+                elevation_change = (end_point[2] - start_point[2])
 
                 if length >= MIN_HILL_LENGTH_M:
                     hills.append({
@@ -169,7 +159,9 @@ def find_hills(points):
             end_point = point
 
     if current_type is not None and start_point is not None:
+
         length = end_point[1] - start_point[1]
+        
         elevation_change = end_point[2] - start_point[2]
 
         if length >= MIN_HILL_LENGTH_M:
@@ -185,7 +177,7 @@ def find_hills(points):
 
 
 def save_stats(stats):
-    conn = get_connection()
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
         with conn.cursor() as cur:

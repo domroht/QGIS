@@ -4,7 +4,7 @@ from collections import defaultdict
 import psycopg2
 import rasterio
 from pyproj import Transformer
-
+from typing import TypedDict
 
 DATABASE_URL = "postgresql://postgres@localhost:5432/osmvelo"
 ROUTE_ID = 1
@@ -17,22 +17,25 @@ TERRAIN_CRS = "EPSG:25832"
 # gøre opfor at DHM har en usikkerhed i data
 SLOPE_WINDOW_M = 100.0
 
+class Tile(TypedDict):
+    path: str
+    min_x: float
+    max_x: float
+    min_y: float
+    max_y: float
 
-def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+def alter_database() -> None:
 
-
-def ensure_database():
-    conn = get_connection()
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
+        with conn.cursor() as cursor:
+            cursor.execute("""
                 ALTER TABLE route_points
                 ADD COLUMN IF NOT EXISTS elevation_m DOUBLE PRECISION;
             """)
 
-            cur.execute("""
+            cursor.execute("""
                 ALTER TABLE route_points
                 ADD COLUMN IF NOT EXISTS slope_percent DOUBLE PRECISION;
             """)
@@ -42,13 +45,12 @@ def ensure_database():
     finally:
         conn.close()
 
-
-def get_route_points():
-    conn = get_connection()
+def get_route_points() -> list[tuple[int, int, float, float, float]]:
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
+        with conn.cursor() as cursor:
+            cursor.execute("""
                 SELECT
                     id,
                     sequence,
@@ -58,17 +60,16 @@ def get_route_points():
                 FROM route_points
                 WHERE route_id = %s
                 ORDER BY sequence;
-            """, (ROUTE_ID,))
+            """, (ROUTE_ID))
 
-            return cur.fetchall()
+            return cursor.fetchall()
 
     finally:
         conn.close()
 
+def build_tile_index() -> list[Tile]:
 
-def build_tile_index():
-
-    tiles = []
+    tiles: list[Tile] = []
 
     for filename in os.listdir(TERRAIN_DIR):
         if not filename.lower().endswith(".tif"):
@@ -85,34 +86,28 @@ def build_tile_index():
 
             bounds = src.bounds
 
-        tiles.append({
-            "path": path,
-            "min_x": bounds.left,
-            "max_x": bounds.right,
-            "min_y": bounds.bottom,
-            "max_y": bounds.top,
-        })
+        tiles.append(
+            Tile(
+                path=path,
+                min_x=bounds.left,
+                max_x=bounds.right,
+                min_y=bounds.bottom,
+                max_y=bounds.top,
+            )
+        )
 
     return tiles
 
-
-def find_tile_for_point(x, y, tiles):
+def find_tile_for_point(x: float, y: float, tiles: list[Tile]) -> Tile | None:   
     for tile in tiles:
-        if (
-            tile["min_x"] <= x <= tile["max_x"]
-            and tile["min_y"] <= y <= tile["max_y"]
-        ):
+        if tile.min_x <= x <= tile.max_x and tile.min_y <= y <= tile.max_y:
             return tile
 
     return None
 
-
-def group_points_by_tile(points, tiles):
-    transformer = Transformer.from_crs(
-        SOURCE_CRS,
-        TERRAIN_CRS,
-        always_xy=True
-    )
+def group_points_by_tile(points: list[tuple[int, int, float, float, float]], tiles: list[Tile]) -> defaultdict:
+    
+    transformer = Transformer.from_crs(SOURCE_CRS, TERRAIN_CRS, always_xy=True)
 
     grouped = defaultdict(list)
 
@@ -143,8 +138,8 @@ def group_points_by_tile(points, tiles):
 
     return grouped
 
-
-def sample_tiles(grouped):
+def sample_tiles(grouped: defaultdict) -> dict, int, int:
+    
     elevations = {}
 
     missing_tile = 0
@@ -159,9 +154,8 @@ def sample_tiles(grouped):
         with rasterio.open(tile_path) as src:
 
             for point in points:
-                value = next(
-                    src.sample([(point["x"], point["y"])])
-                )[0]
+                # find raster værdien ved hvert punkt
+                value = next(src.sample([(point["x"], point["y"])]))[0]
 
                 if src.nodata is not None and value == src.nodata:
                     elevations[point["id"]] = None
@@ -171,15 +165,14 @@ def sample_tiles(grouped):
 
     return elevations, nodata, missing_tile
 
-
-def update_elevations(elevations):
-    conn = get_connection()
+def update_elevations(elevations: dict) -> None:
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
-        with conn.cursor() as cur:
+        with conn.cursor() as cursor:
 
             for point_id, elevation in elevations.items():
-                cur.execute("""
+                cursor.execute("""
                     UPDATE route_points
                     SET elevation_m = %s
                     WHERE id = %s;
@@ -190,15 +183,14 @@ def update_elevations(elevations):
     finally:
         conn.close()
 
+def calculate_slopes() -> None:
 
-def calculate_slopes():
-
-    conn = get_connection()
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
-        with conn.cursor() as cur:
+        with conn.cursor() as cursor:
 
-            cur.execute("""
+            cursor.execute("""
                 SELECT
                     id,
                     sequence,
@@ -210,7 +202,7 @@ def calculate_slopes():
                 ORDER BY sequence;
             """, (ROUTE_ID,))
 
-            points = cur.fetchall()
+            points = cursor.fetchall()
 
             updates = []
 
@@ -225,9 +217,7 @@ def calculate_slopes():
                 for j in range(i - 1, -1, -1):
                     candidate = points[j]
 
-                    distance_difference = (
-                        current_distance - candidate[2]
-                    )
+                    distance_difference = (current_distance - candidate[2])
 
                     if distance_difference >= SLOPE_WINDOW_M:
                         previous = candidate
@@ -240,23 +230,17 @@ def calculate_slopes():
                 previous_distance = previous[2]
                 previous_elevation = previous[3]
 
-                distance_difference = (
-                    current_distance - previous_distance
-                )
+                distance_difference = (current_distance - previous_distance)
 
                 if distance_difference <= 0:
                     slope = None
                 else:
-                    slope = (
-                        (current_elevation - previous_elevation)
-                        / distance_difference
-                        * 100.0
-                    )
+                    slope = ((current_elevation - previous_elevation) / distance_difference * 100.0)
 
                 updates.append((slope, current_id))
 
             for slope, point_id in updates:
-                cur.execute("""
+                cursor.execute("""
                     UPDATE route_points
                     SET slope_percent = %s
                     WHERE id = %s;
@@ -270,7 +254,7 @@ def calculate_slopes():
 
 def main():
 
-    ensure_database()
+    alter_database()
 
     points = get_route_points()
 
@@ -281,7 +265,7 @@ def main():
     elevations, nodata, missing_tile = sample_tiles(grouped)
 
     update_elevations(elevations)
-
+    
     calculate_slopes()
 
 

@@ -6,17 +6,12 @@ DATABASE_URL = "postgresql://postgres@localhost:5432/osmvelo"
 ROUTE_ID = 1
 OUTPUT_FILE = "data/output/elevation_profile.csv"
 
-
-def get_connection():
-    return psycopg2.connect(DATABASE_URL)
-
-
-def get_profile_data():
-    conn = get_connection()
+def get_profile_data() -> list[tuple[int, float, float, float, float, float]]:
+    conn = psycopg2.connect(DATABASE_URL)
 
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
+        with conn.cursor() as cursor:
+            cursor.execute("""
                 SELECT
                     sequence,
                     distance_from_start,
@@ -30,19 +25,14 @@ def get_profile_data():
                 ORDER BY sequence;
             """, (ROUTE_ID,))
 
-            return cur.fetchall()
+            return cursor.fetchall()
 
     finally:
         conn.close()
 
 
-def write_csv(rows):
-    with open(
-        OUTPUT_FILE,
-        "w",
-        newline="",
-        encoding="utf-8"
-    ) as file:
+def write_csv(rows: list[tuple[int, float, float, float, float, float]]) -> None:
+    with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as file:
 
         writer = csv.writer(file)
 
