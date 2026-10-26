@@ -1,0 +1,12 @@
+[general]
+name=DDM QA
+qgisMinimumVersion=4.0
+description=QA værktøj for Danmarks Dybdemodel (DDM)
+version=0.1.0
+author=DDM QA
+email=
+about=QA Tool
+category=Processing
+hasProcessingProvider=yes
+experimental=True
+deprecated=False
