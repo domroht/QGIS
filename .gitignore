@@ -10,5 +10,5 @@ output/
 build/
 dist/
 *.pyc
-ddm_qa_plugin/bin/ddm_qa
+ddm_qa/ddm_qa_plugin/bin/ddm_qa
 *.zip
