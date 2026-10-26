@@ -1023,7 +1023,7 @@ def render_report(results: dict, figure_paths: dict) -> str:
 body {{
     margin: 0;
 
-    background: var(--background);<!-- Dette er en kommentar -->
+    background: var(--background);
     color: var(--text);
 
     font-family:
