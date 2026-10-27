@@ -1,0 +1,589 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSM-Velo | Cycling Route Analysis</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+        :root {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #202b36;
+            background: #f3f6f8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body { margin: 0; }
+
+        header {
+            background: #173b35;
+            color: white;
+            padding: 20px 24px;
+        }
+
+        header h1 { margin: 0; font-size: 1.6rem; }
+        header p { margin: 6px 0 0; color: #d6e8e2; }
+
+        main {
+            max-width: 1400px;
+            margin: auto;
+            padding: 24px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border: 1px solid #dce4e8;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+
+        h2 { font-size: 1.05rem; margin: 0 0 14px; }
+
+        button, input { font: inherit; }
+
+        button {
+            border: 0;
+            border-radius: 7px;
+            padding: 10px 13px;
+            cursor: pointer;
+        }
+
+        button:disabled { opacity: .55; cursor: wait; }
+
+        .primary {
+            background: #176b55;
+            color: white;
+        }
+
+        .secondary {
+            background: #e8efed;
+            color: #173b35;
+        }
+
+        .upload-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input[type="file"] { max-width: 100%; }
+
+        #status {
+            margin-top: 12px;
+            font-size: .9rem;
+            overflow-wrap: anywhere;
+        }
+
+        .route-item {
+            width: 100%;
+            display: block;
+            text-align: left;
+            background: #f4f7f6;
+            border: 1px solid #e0e8e5;
+            margin-top: 8px;
+            color: #202b36;
+        }
+
+        .route-item.active {
+            border-color: #176b55;
+            background: #e7f3ee;
+        }
+
+        .route-item strong, .route-item span { display: block; }
+        .route-item span { margin-top: 4px; font-size: .85rem; color: #53636d; }
+
+        #map {
+            width: 100%;
+            height: 520px;
+            border-radius: 9px;
+            background: #e8edef;
+        }
+
+        .map-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .stat {
+            background: #f4f7f6;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .stat span { display: block; color: #617079; font-size: .82rem; }
+        .stat strong { display: block; margin-top: 5px; font-size: 1.15rem; }
+
+        .plots {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .plot-card {
+            border: 1px solid #e0e7e9;
+            border-radius: 8px;
+            padding: 10px;
+            min-width: 0;
+        }
+
+        .plot-card h3 { font-size: .95rem; margin: 0 0 8px; }
+        .plot-card img { display: block; width: 100%; height: auto; }
+        .plot-card.full { grid-column: 1 / -1; }
+
+        .muted { color: #617079; font-size: .9rem; }
+
+        @media (max-width: 850px) {
+            main { padding: 14px; }
+            .layout { grid-template-columns: 1fr; }
+            #map { height: 400px; }
+            .plots { grid-template-columns: 1fr; }
+            .plot-card.full { grid-column: auto; }
+        }
+
+        @media (max-width: 480px) {
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>OSM-Velo</h1>
+    <p>Cycling route mapping and terrain analysis</p>
+</header>
+
+<main>
+    <div class="layout">
+        <aside>
+            <section class="panel">
+                <h2>Import GPX route</h2>
+                <form id="upload-form" class="upload-row">
+                    <input
+                        id="gpx-file"
+                        type="file"
+                        accept=".gpx,application/gpx+xml,application/xml,text/xml"
+                        required
+                    >
+                    <button class="primary" id="upload-button" type="submit">
+                        Upload GPX
+                    </button>
+                </form>
+                <div id="status" role="status" aria-live="polite">
+                    Ready. Upload a GPX file or select an existing route.
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Saved routes</h2>
+                <button class="secondary" id="refresh-button" type="button">
+                    Refresh routes
+                </button>
+                <div id="route-list" class="muted" style="margin-top: 12px;">
+                    Loading routes…
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Route analysis</h2>
+                <p class="muted">Select a route before running analyses.</p>
+                <div class="upload-row">
+                    <button class="secondary" id="elevation-button" type="button" disabled>
+                        Analyse elevation
+                    </button>
+                    <button class="secondary" id="wind-button" type="button" disabled>
+                        Analyse wind
+                    </button>
+                    <button class="primary" id="plots-button" type="button" disabled>
+                        Generate plots
+                    </button>
+                </div>
+                <div id="wind-form" style="margin-top: 14px;">
+                    <label for="wind-speed">Wind speed (m/s)</label>
+                    <input id="wind-speed" type="number" min="0" max="100" step="0.1" value="5" style="width: 100%; margin: 6px 0 12px; padding: 8px;">
+                    <label for="wind-direction">Wind direction (degrees from north)</label>
+                    <input id="wind-direction" type="number" min="0" max="360" step="1" value="270" style="width: 100%; margin-top: 6px; padding: 8px;">
+                </div>
+            </section>
+        </aside>
+
+        <div>
+            <section class="panel">
+                <div class="map-heading">
+                    <h2>Route map</h2>
+                    <button class="secondary" id="fit-button" type="button" disabled>
+                        Fit route to map
+                    </button>
+                </div>
+                <div id="map" aria-label="Interactive cycling route map"></div>
+                <div class="stats">
+                    <div class="stat">
+                        <span>Route</span>
+                        <strong id="route-name">None selected</strong>
+                    </div>
+                    <div class="stat">
+                        <span>Distance</span>
+                        <strong id="route-distance">—</strong>
+                    </div>
+                    <div class="stat">
+                        <span>GPX points</span>
+                        <strong id="route-points">—</strong>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Analysis plots</h2>
+                <div id="plot-message" class="muted">
+                    Select a route and generate plots to display them here.
+                </div>
+                <div class="plots" id="plots-container"></div>
+            </section>
+        </div>
+    </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+const API = "/api/routes";
+
+const map = L.map("map").setView([56.0, 10.0], 7);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+let selectedRouteId = null;
+let routeLayer = null;
+
+const elements = {
+    status: document.getElementById("status"),
+    routeList: document.getElementById("route-list"),
+    uploadForm: document.getElementById("upload-form"),
+    uploadButton: document.getElementById("upload-button"),
+    file: document.getElementById("gpx-file"),
+    elevationButton: document.getElementById("elevation-button"),
+    windButton: document.getElementById("wind-button"),
+    plotsButton: document.getElementById("plots-button"),
+    fitButton: document.getElementById("fit-button"),
+    routeName: document.getElementById("route-name"),
+    routeDistance: document.getElementById("route-distance"),
+    routePoints: document.getElementById("route-points"),
+    plotMessage: document.getElementById("plot-message"),
+    plots: document.getElementById("plots-container")
+};
+
+function setStatus(message, isError = false) {
+    elements.status.textContent = message;
+    elements.status.style.color = isError ? "#b42318" : "#202b36";
+}
+
+async function apiRequest(url, options = {}) {
+    const response = await fetch(url, options);
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : await response.text();
+
+    if (!response.ok) {
+        const message = data && typeof data === "object"
+            ? (data.detail || JSON.stringify(data))
+            : data;
+        throw new Error(message || `Request failed (${response.status})`);
+    }
+    return data;
+}
+
+function routeIdOf(route) {
+    return route.route_id ?? route.id;
+}
+
+function renderRouteList(routes) {
+    elements.routeList.replaceChildren();
+
+    if (!routes.length) {
+        elements.routeList.textContent = "No routes found. Upload a GPX file to get started.";
+        return;
+    }
+
+    routes.forEach(route => {
+        const id = routeIdOf(route);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "route-item" + (String(id) === String(selectedRouteId) ? " active" : "");
+
+        const name = document.createElement("strong");
+        name.textContent = route.name || `Route ${id}`;
+
+        const details = document.createElement("span");
+        const distance = Number(route.distance_km ?? 0);
+        details.textContent = `${Number.isFinite(distance) ? distance.toFixed(2) : "—"} km · ${route.point_count ?? "—"} points`;
+
+        button.append(name, details);
+        button.addEventListener("click", () => selectRoute(route));
+        elements.routeList.appendChild(button);
+    });
+}
+
+async function refreshRoutes() {
+    try {
+        const data = await apiRequest(API);
+        const routes = Array.isArray(data) ? data : (data.routes || []);
+        renderRouteList(routes);
+    } catch (error) {
+        elements.routeList.textContent = `Could not load routes: ${error.message}`;
+    }
+}
+
+async function selectRoute(route) {
+    const id = routeIdOf(route);
+    selectedRouteId = id;
+
+    elements.elevationButton.disabled = false;
+    elements.windButton.disabled = false;
+    elements.plotsButton.disabled = false;
+    elements.fitButton.disabled = false;
+
+    elements.routeName.textContent = route.name || `Route ${id}`;
+    elements.routeDistance.textContent =
+        `${Number(route.distance_km ?? 0).toFixed(2)} km`;
+    elements.routePoints.textContent = route.point_count ?? "—";
+    elements.plots.replaceChildren();
+    elements.plotMessage.textContent = "Loading route analysis…";
+    setStatus(`Loading route ${id}…`);
+
+    try {
+        const details = await apiRequest(`${API}/${encodeURIComponent(id)}`);
+
+        // The existing route detail endpoint returns summary data, not geometry.
+        // Use the GPX route geometry endpoint when available; otherwise report
+        // clearly that map geometry has not yet been exposed by the API.
+        const geometry = await apiRequest(
+                `${API}/${encodeURIComponent(id)}/geometry`
+            );
+
+            displayGeometry(geometry);
+            setStatus(`Route ${id} loaded on the map.`);
+            await refreshRoutes();
+
+        if (geometry) {
+            displayGeometry(geometry);
+            setStatus(`Route ${id} loaded on the map.`);
+        } else {
+            clearRouteLayer();
+            elements.plotMessage.textContent =
+                "Route selected. The current API returns route metadata but not its coordinates, so map geometry cannot be drawn yet.";
+            setStatus(
+                `Route ${id} selected. A route-geometry API endpoint is still needed to draw its line on the map.`
+            );
+        }
+
+        await refreshRoutes();
+    } catch (error) {
+        setStatus(`Could not load route: ${error.message}`, true);
+    }
+}
+
+function displayGeometry(geometry) {
+    clearRouteLayer();
+
+    let geojson = geometry;
+    if (typeof geometry === "string") {
+        try { geojson = JSON.parse(geometry); }
+        catch { throw new Error("The route geometry is not valid GeoJSON."); }
+    }
+
+    if (geojson.type === "FeatureCollection" ||
+        geojson.type === "Feature" ||
+        geojson.type === "LineString" ||
+        geojson.type === "MultiLineString") {
+        routeLayer = L.geoJSON(geojson, {
+            style: { color: "#176b55", weight: 5, opacity: 0.9 }
+        }).addTo(map);
+    } else {
+        throw new Error("Unsupported route geometry format.");
+    }
+
+    fitRoute();
+}
+
+function clearRouteLayer() {
+    if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+    }
+}
+
+function fitRoute() {
+    if (routeLayer && routeLayer.getBounds().isValid()) {
+        map.fitBounds(routeLayer.getBounds(), { padding: [25, 25] });
+    }
+}
+
+elements.uploadForm.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const file = elements.file.files[0];
+    if (!file) {
+        setStatus("Choose a GPX file first.", true);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    elements.uploadButton.disabled = true;
+    setStatus("Uploading GPX file…");
+
+    try {
+        const result = await apiRequest(API, {
+            method: "POST",
+            body: formData
+        });
+
+        setStatus(`Uploaded successfully: ${result.name || file.name}`);
+        await refreshRoutes();
+
+        const id = routeIdOf(result);
+        if (id !== undefined && id !== null) {
+            await selectRoute(result);
+        }
+        elements.file.value = "";
+    } catch (error) {
+        setStatus(`Upload failed: ${error.message}`, true);
+    } finally {
+        elements.uploadButton.disabled = false;
+    }
+});
+
+elements.elevationButton.addEventListener("click", async () => {
+    if (selectedRouteId === null) return;
+
+    setStatus("Running elevation analysis…");
+    elements.elevationButton.disabled = true;
+
+    try {
+        await apiRequest(`${API}/${encodeURIComponent(selectedRouteId)}/elevation`, {
+            method: "POST"
+        });
+        setStatus("Elevation analysis completed.");
+    } catch (error) {
+        setStatus(`Elevation analysis failed: ${error.message}`, true);
+    } finally {
+        elements.elevationButton.disabled = false;
+    }
+});
+
+elements.windButton.addEventListener("click", async () => {
+    if (selectedRouteId === null) return;
+
+    const windSpeed = Number(document.getElementById("wind-speed").value);
+    const windDirection = Number(document.getElementById("wind-direction").value);
+
+    if (!Number.isFinite(windSpeed) || windSpeed < 0 || windSpeed > 100 ||
+        !Number.isFinite(windDirection) || windDirection < 0 || windDirection > 360) {
+        setStatus("Enter a wind speed from 0–100 m/s and direction from 0–360°.", true);
+        return;
+    }
+
+    setStatus("Running wind analysis…");
+    elements.windButton.disabled = true;
+
+    try {
+        await apiRequest(`${API}/${encodeURIComponent(selectedRouteId)}/wind`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                wind_speed_ms: windSpeed,
+                wind_direction_deg: windDirection
+            })
+        });
+        setStatus("Wind analysis completed.");
+    } catch (error) {
+        setStatus(`Wind analysis failed: ${error.message}`, true);
+    } finally {
+        elements.windButton.disabled = false;
+    }
+});
+
+elements.plotsButton.addEventListener("click", async () => {
+    if (selectedRouteId === null) return;
+
+    elements.plotsButton.disabled = true;
+    elements.plotMessage.textContent = "Generating plots…";
+    elements.plots.replaceChildren();
+    setStatus("Generating elevation, slope, and wind plots…");
+
+    try {
+        await apiRequest(`${API}/${encodeURIComponent(selectedRouteId)}/plots`, {
+            method: "POST"
+        });
+
+        const plotNames = [
+            ["elevation", "Elevation profile"],
+            ["slope", "Slope profile"],
+            ["wind", "Wind effect"]
+        ];
+
+        plotNames.forEach(([name, title]) => {
+            const card = document.createElement("div");
+            card.className = "plot-card" + (name === "elevation" ? " full" : "");
+
+            const heading = document.createElement("h3");
+            heading.textContent = title;
+
+            const image = document.createElement("img");
+            image.alt = title;
+            image.loading = "lazy";
+            image.src = `${API}/${encodeURIComponent(selectedRouteId)}/plots/${name}?t=${Date.now()}`;
+            image.addEventListener("error", () => {
+                image.alt = `${title} unavailable`;
+                image.replaceWith(document.createTextNode("Plot image could not be loaded."));
+            });
+
+            card.append(heading, image);
+            elements.plots.appendChild(card);
+        });
+
+        elements.plotMessage.textContent = "";
+        setStatus("Plots generated.");
+    } catch (error) {
+        elements.plotMessage.textContent = "Could not generate plots.";
+        setStatus(`Plot generation failed: ${error.message}`, true);
+    } finally {
+        elements.plotsButton.disabled = false;
+    }
+});
+
+elements.fitButton.addEventListener("click", fitRoute);
+document.getElementById("refresh-button").addEventListener("click", refreshRoutes);
+
+refreshRoutes();
+</script>
+</body>
+</html>
